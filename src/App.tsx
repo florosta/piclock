@@ -1,23 +1,32 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePlayer } from './hooks/usePlayer'
 import { useEpisodes } from './hooks/useEpisodes'
 import ClockView from './views/ClockView'
-import PodcastView from './views/PodcastView'
-
-type View = 'clock' | 'podcasts'
+import EpisodePicker from './views/EpisodePicker'
 
 export default function App() {
-  const [view, setView] = useState<View>('clock')
   const player = usePlayer()
   const episodes = useEpisodes()
+  const [showPicker, setShowPicker] = useState(false)
+
+  // Auto-select the latest episode once loaded
+  useEffect(() => {
+    if (episodes.episodes.length > 0 && !player.currentEpisode) {
+      player.select(episodes.episodes[0])
+    }
+  }, [episodes.episodes])
 
   return (
     <>
       <audio ref={player.audioRef} style={{ display: 'none' }} />
-      {view === 'clock' ? (
-        <ClockView player={player} onOpenPodcasts={() => setView('podcasts')} />
-      ) : (
-        <PodcastView player={player} episodes={episodes} onClose={() => setView('clock')} />
+      <ClockView player={player} onShowPicker={() => setShowPicker(true)} />
+      {showPicker && (
+        <EpisodePicker
+          episodes={episodes}
+          currentEpisode={player.currentEpisode}
+          onSelect={ep => { player.select(ep); setShowPicker(false) }}
+          onClose={() => setShowPicker(false)}
+        />
       )}
     </>
   )

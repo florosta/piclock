@@ -9,8 +9,9 @@ export interface PlayerState {
   elapsed: number         // seconds
   duration: number        // seconds
   sleepTimer: number | null  // seconds remaining, null = off
-  play: (episode: Episode) => void
-  togglePlayPause: () => void
+  select: (episode: Episode) => void   // load without playing
+  play: () => void                     // play current episode
+  stop: () => void                     // pause
   skip: (seconds: number) => void
   seekTo: (ratio: number) => void
   setSleepTimer: (minutes: number) => void
@@ -20,24 +21,13 @@ export interface PlayerState {
 export function usePlayer(): PlayerState {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null)
+  const currentEpisodeRef = useRef<Episode | null>(null)
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [duration, setDuration] = useState(0)
   const [sleepTimerEnds, setSleepTimerEnds] = useState<number | null>(null)
   const [sleepTimer, setSleepTimerDisplay] = useState<number | null>(null)
-
-  // Update src and autoplay when episode changes
-  useEffect(() => {
-    const el = audioRef.current
-    if (!el) return
-    if (!currentEpisode) { el.src = ''; return }
-    el.src = `/api/stream/${currentEpisode.podcast.itemId}/${currentEpisode.audioTrack.ino}`
-    setProgress(0)
-    setElapsed(0)
-    setDuration(0)
-    el.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
-  }, [currentEpisode?.id])
 
   // Attach audio event listeners once
   useEffect(() => {
@@ -50,7 +40,7 @@ export function usePlayer(): PlayerState {
       }
     }
     const onDurationChange = () => setDuration(el.duration || 0)
-    const onEnded = () => setPlaying(false)
+    const onEnded = () => { setPlaying(false); setSleepTimerEnds(null) }
     el.addEventListener('timeupdate', onTimeUpdate)
     el.addEventListener('durationchange', onDurationChange)
     el.addEventListener('ended', onEnded)
@@ -61,12 +51,9 @@ export function usePlayer(): PlayerState {
     }
   }, [])
 
-  // Sleep timer countdown
+  // Sleep timer countdown — auto-pauses when it hits zero
   useEffect(() => {
-    if (sleepTimerEnds === null) {
-      setSleepTimerDisplay(null)
-      return
-    }
+    if (sleepTimerEnds === null) { setSleepTimerDisplay(null); return }
     const tick = () => {
       const remaining = Math.ceil((sleepTimerEnds - Date.now()) / 1000)
       if (remaining <= 0) {
@@ -82,13 +69,36 @@ export function usePlayer(): PlayerState {
     return () => clearInterval(id)
   }, [sleepTimerEnds])
 
-  const play = useCallback((episode: Episode) => setCurrentEpisode(episode), [])
-
-  const togglePlayPause = useCallback(() => {
+  // Load episode into audio element without playing
+  const select = useCallback((episode: Episode) => {
     const el = audioRef.current
-    if (!el) return
-    if (el.paused) { el.play(); setPlaying(true) }
-    else { el.pause(); setPlaying(false) }
+    if (el) { el.pause(); el.src = '' }
+    setPlaying(false)
+    setProgress(0)
+    setElapsed(0)
+    setDuration(0)
+    setSleepTimerEnds(null)
+    currentEpisodeRef.current = episode
+    setCurrentEpisode(episode)
+  }, [])
+
+  // Play the currently selected episode
+  const play = useCallback(() => {
+    const el = audioRef.current
+    const ep = currentEpisodeRef.current
+    if (!el || !ep) return
+    const src = `/api/stream/${ep.podcast.itemId}/${ep.audioTrack.ino}`
+    // Only reset src if we're loading a different episode
+    if (!el.src.endsWith(ep.audioTrack.ino)) {
+      el.src = src
+      setProgress(0); setElapsed(0); setDuration(0)
+    }
+    el.play().then(() => setPlaying(true)).catch(console.error)
+  }, [])
+
+  const stop = useCallback(() => {
+    audioRef.current?.pause()
+    setPlaying(false)
   }, [])
 
   const skip = useCallback((seconds: number) => {
@@ -109,6 +119,6 @@ export function usePlayer(): PlayerState {
 
   return {
     audioRef, currentEpisode, playing, progress, elapsed, duration, sleepTimer,
-    play, togglePlayPause, skip, seekTo, setSleepTimer, cancelSleepTimer,
+    select, play, stop, skip, seekTo, setSleepTimer, cancelSleepTimer,
   }
 }
