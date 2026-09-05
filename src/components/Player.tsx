@@ -1,79 +1,92 @@
 import { useEffect, useState } from 'react'
-import type { Episode } from '../types'
+import type { PlayerState } from '../hooks/usePlayer'
 
-interface Props {
-  episode: Episode | null
-  playing: boolean
-  onToggle: () => void
-  onSkip: (seconds: number) => void
-  audioRef: React.RefObject<HTMLAudioElement | null>
+const SLEEP_PRESETS = [15, 30, 45, 60] // minutes
+
+function fmtTime(s: number) {
+  const m = Math.floor(s / 60)
+  const ss = Math.floor(s % 60)
+  return `${m}:${String(ss).padStart(2, '0')}`
 }
 
-export default function Player({ episode, playing, onToggle, onSkip, audioRef }: Props) {
-  const [progress, setProgress] = useState(0)   // 0–1
-  const [elapsed, setElapsed] = useState(0)      // seconds
+interface Props {
+  player: PlayerState
+}
 
-  useEffect(() => {
-    const el = audioRef.current
-    if (!el) return
-    const update = () => {
-      if (el.duration) {
-        setProgress(el.currentTime / el.duration)
-        setElapsed(el.currentTime)
+export default function Player({ player }: Props) {
+  const {
+    currentEpisode, playing, progress, elapsed, duration, sleepTimer,
+    togglePlayPause, skip, seekTo, setSleepTimer, cancelSleepTimer,
+  } = player
+
+  // Which sleep preset index is currently set (UI state only)
+  const [presetIdx, setPresetIdx] = useState(-1)
+
+  // Keep preset index in sync if timer was cancelled externally
+  useEffect(() => { if (sleepTimer === null) setPresetIdx(-1) }, [sleepTimer])
+
+  function handleSleepTap() {
+    if (sleepTimer === null) {
+      setPresetIdx(0)
+      setSleepTimer(SLEEP_PRESETS[0])
+    } else {
+      const next = presetIdx + 1
+      if (next < SLEEP_PRESETS.length) {
+        setPresetIdx(next)
+        setSleepTimer(SLEEP_PRESETS[next])
+      } else {
+        cancelSleepTimer()
       }
     }
-    el.addEventListener('timeupdate', update)
-    return () => el.removeEventListener('timeupdate', update)
-  }, [audioRef, episode])
-
-  // reset on episode change
-  useEffect(() => { setProgress(0); setElapsed(0) }, [episode?.id])
+  }
 
   function scrub(e: React.MouseEvent<HTMLDivElement>) {
-    const el = audioRef.current
-    if (!el || !el.duration) return
     const rect = e.currentTarget.getBoundingClientRect()
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    el.currentTime = ratio * el.duration
+    seekTo(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)))
   }
 
-  if (!episode) return null
+  const sleepLabel = sleepTimer !== null
+    ? `${SLEEP_PRESETS[presetIdx]}m · ${fmtTime(sleepTimer)}`
+    : 'Sleep'
 
-  const fmt = (s: number) => {
-    const m = Math.floor(s / 60)
-    const ss = Math.floor(s % 60)
-    return `${m}:${String(ss).padStart(2, '0')}`
-  }
+  if (!currentEpisode) return null
 
   return (
     <div style={styles.root}>
       <div style={styles.info}>
         <img
           style={styles.cover}
-          src={episode.podcast.coverUrl}
+          src={currentEpisode.podcast.coverUrl}
           alt=""
           onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
         />
         <div style={styles.titleWrap}>
-          <div style={styles.title}>{episode.title}</div>
-          <div style={styles.podcast}>{episode.podcast.title}</div>
+          <div style={styles.title}>{currentEpisode.title}</div>
+          <div style={styles.podcast}>{currentEpisode.podcast.title}</div>
         </div>
       </div>
 
       <div style={styles.progressRow}>
-        <span style={styles.time}>{fmt(elapsed)}</span>
+        <span style={styles.time}>{fmtTime(elapsed)}</span>
         <div style={styles.bar} onClick={scrub}>
           <div style={{ ...styles.fill, width: `${progress * 100}%` }} />
         </div>
-        <span style={styles.time}>{fmt(episode.duration)}</span>
+        <span style={styles.time}>{fmtTime(duration)}</span>
       </div>
 
       <div style={styles.controls}>
-        <button style={styles.btn} onClick={() => onSkip(-30)}>−30s</button>
-        <button style={{ ...styles.btn, ...styles.playBtn }} onClick={onToggle}>
+        <button
+          style={{ ...styles.btn, ...(sleepTimer !== null ? styles.btnActive : {}) }}
+          onClick={handleSleepTap}
+        >
+          {sleepLabel}
+        </button>
+        <button style={styles.btn} onClick={() => skip(-30)}>−30s</button>
+        <button style={{ ...styles.btn, ...styles.playBtn }} onClick={togglePlayPause}>
           {playing ? '⏸' : '▶'}
         </button>
-        <button style={styles.btn} onClick={() => onSkip(30)}>+30s</button>
+        <button style={styles.btn} onClick={() => skip(30)}>+30s</button>
+        <div style={styles.spacer} />
       </div>
     </div>
   )
@@ -81,28 +94,16 @@ export default function Player({ episode, playing, onToggle, onSkip, audioRef }:
 
 const styles: Record<string, React.CSSProperties> = {
   root: {
-    flexShrink: 0,
-    borderTop: '1px solid var(--border)',
-    background: 'var(--surface)',
-    padding: '2.5vw 4vw',
+    flexShrink: 0, borderTop: '1px solid var(--border)',
+    background: 'var(--surface)', padding: '2.5vw 4vw',
     display: 'flex', flexDirection: 'column', gap: '2vw',
   },
-  info: {
-    display: 'flex', alignItems: 'center', gap: '2.5vw',
-  },
-  cover: {
-    width: '8vw', height: '8vw', borderRadius: '1vw', objectFit: 'cover', flexShrink: 0,
-  },
+  info: { display: 'flex', alignItems: 'center', gap: '2.5vw' },
+  cover: { width: '8vw', height: '8vw', borderRadius: '1vw', objectFit: 'cover', flexShrink: 0 },
   titleWrap: { flex: 1, overflow: 'hidden' },
-  title: {
-    fontSize: '2.5vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-  },
-  podcast: {
-    fontSize: '1.8vw', opacity: 0.4, marginTop: '0.5vw',
-  },
-  progressRow: {
-    display: 'flex', alignItems: 'center', gap: '2vw',
-  },
+  title: { fontSize: '2.5vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  podcast: { fontSize: '1.8vw', opacity: 0.4, marginTop: '0.5vw' },
+  progressRow: { display: 'flex', alignItems: 'center', gap: '2vw' },
   time: { fontSize: '1.8vw', opacity: 0.4, flexShrink: 0 },
   bar: {
     flex: 1, height: '0.6vw', background: 'var(--border)',
@@ -113,14 +114,14 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--amber-dim)', borderRadius: '0.3vw',
   },
   controls: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6vw',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4vw',
   },
+  spacer: { width: '8vw' }, // balances the sleep button on the left
   btn: {
     background: 'none', border: 'none', color: 'var(--amber)',
-    fontSize: '3vw', cursor: 'pointer', fontFamily: 'var(--font)',
-    opacity: 0.7, letterSpacing: '0.05em',
+    fontSize: '2.2vw', cursor: 'pointer', fontFamily: 'var(--font)',
+    opacity: 0.6, letterSpacing: '0.05em', whiteSpace: 'nowrap',
   },
-  playBtn: {
-    fontSize: '5vw', opacity: 1,
-  },
+  btnActive: { opacity: 1, color: 'var(--amber)' },
+  playBtn: { fontSize: '5vw', opacity: 1 },
 }
