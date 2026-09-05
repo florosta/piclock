@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { usePlayer } from './hooks/usePlayer'
 import { useEpisodes } from './hooks/useEpisodes'
+import { useBacklight } from './hooks/useBacklight'
 import ClockView from './views/ClockView'
 import EpisodePicker from './views/EpisodePicker'
 
 export default function App() {
   const player = usePlayer()
   const episodes = useEpisodes()
+  useBacklight()
   const [showPicker, setShowPicker] = useState(false)
 
   // Auto-select the latest episode once loaded

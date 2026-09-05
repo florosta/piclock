@@ -4,6 +4,7 @@ import cors from 'cors'
 import path from 'path'
 import { Readable } from 'stream'
 import { fileURLToPath } from 'url'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -55,6 +56,21 @@ app.get('/api/episodes', async (_req, res) => {
 
   episodes.sort((a: any, b: any) => b.publishedAt - a.publishedAt)
   res.json(episodes)
+})
+
+// Backlight control
+const BACKLIGHT = '/sys/class/backlight/panel_backlight@1/brightness'
+const hasBacklight = existsSync(BACKLIGHT)
+
+app.get('/api/brightness', (_req, res) => {
+  const value = hasBacklight ? parseInt(readFileSync(BACKLIGHT, 'utf8').trim()) : 15
+  res.json({ value, max: 31, supported: hasBacklight })
+})
+
+app.post('/api/brightness', (req, res) => {
+  const { value } = req.body as { value: number }
+  if (hasBacklight) writeFileSync(BACKLIGHT, String(Math.round(Math.max(0, Math.min(31, value)))))
+  res.json({ ok: true })
 })
 
 // Streaming proxy — forwards Range headers so seeking works
