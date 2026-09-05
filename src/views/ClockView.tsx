@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { PlayerState } from '../hooks/usePlayer'
 
-const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function pad(n: number) { return String(n).padStart(2, '0') }
 function fmtTimer(s: number) {
-  const m = Math.floor(s / 60)
-  return `${m}:${String(s % 60).padStart(2, '0')}`
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 interface Props {
@@ -24,73 +23,48 @@ export default function ClockView({ player, onShowPicker }: Props) {
 
   const { currentEpisode, playing, progress, sleepTimer, play, stop, skip, setSleepTimer } = player
 
-  function handlePlaySleep() {
-    play()
-    setSleepTimer(15)
-  }
+  const playIcon = playing
+    ? (sleepTimer !== null ? `☽ ${fmtTimer(sleepTimer)}` : '▶☽')
+    : '▶☽'
 
   return (
     <div style={s.root}>
 
-      {/* Clock */}
-      <div style={s.clockSection}>
+      <div style={s.clock}>
         <div style={s.time}>{pad(now.getHours())}:{pad(now.getMinutes())}</div>
-        <div style={s.date}>
-          {DAYS[now.getDay()]} {now.getDate()} {MONTHS[now.getMonth()]}
-        </div>
+        <div style={s.date}>{DAYS[now.getDay()]} {now.getDate()} {MONTHS[now.getMonth()]}</div>
       </div>
 
-      {/* Divider */}
-      <div style={s.divider} />
-
-      {/* Podcast section */}
-      <div style={s.podcastSection}>
-
-        {/* Episode info */}
-        <div style={s.episodeInfo}>
-          {currentEpisode ? (
-            <>
-              <div style={s.episodeTitle}>{currentEpisode.title}</div>
-              <div style={s.podcastName}>{currentEpisode.podcast.title}</div>
-            </>
-          ) : (
-            <div style={s.podcastName}>Loading…</div>
-          )}
+      <div style={s.strip}>
+        <div style={s.episodeName}>
+          {currentEpisode?.title ?? ''}
         </div>
-
-        {/* Progress bar */}
         <div style={s.progressBar}>
           <div style={{ ...s.progressFill, width: `${progress * 100}%` }} />
         </div>
-
-        {/* Controls */}
-        <div style={s.controls}>
-          <Btn onClick={() => skip(-20)} disabled={!currentEpisode}>← 20s</Btn>
-          <Btn onClick={handlePlaySleep} disabled={!currentEpisode} primary>
-            {playing ? `▶ ${sleepTimer !== null ? fmtTimer(sleepTimer) : '15m'}` : '▶ Sleep 15m'}
-          </Btn>
-          <Btn onClick={stop} disabled={!playing}>■ Stop</Btn>
-          <Btn onClick={onShowPicker}>≡</Btn>
+        <div style={s.btnRow}>
+          <Sq onClick={() => skip(-20)} disabled={!currentEpisode}>⏪</Sq>
+          <Sq onClick={() => { play(); setSleepTimer(15) }} disabled={!currentEpisode} highlight={playing}>
+            {playIcon}
+          </Sq>
+          <Sq onClick={stop} disabled={!playing}>⏹</Sq>
+          <Sq onClick={onShowPicker}>☰</Sq>
         </div>
-
       </div>
+
     </div>
   )
 }
 
-function Btn({ children, onClick, disabled, primary }: {
+function Sq({ children, onClick, disabled, highlight }: {
   children: React.ReactNode
   onClick: () => void
   disabled?: boolean
-  primary?: boolean
+  highlight?: boolean
 }) {
   return (
     <button
-      style={{
-        ...s.btn,
-        ...(primary ? s.btnPrimary : {}),
-        ...(disabled ? s.btnDisabled : {}),
-      }}
+      style={{ ...s.btn, ...(highlight ? s.btnOn : {}), ...(disabled ? s.btnOff : {}) }}
       onClick={onClick}
       disabled={disabled}
     >
@@ -99,76 +73,68 @@ function Btn({ children, onClick, disabled, primary }: {
   )
 }
 
+const BTN = '9vw'
+
 const s: Record<string, React.CSSProperties> = {
   root: {
     width: '100%', height: '100%',
     display: 'flex', flexDirection: 'column',
   },
-  clockSection: {
+  clock: {
     flex: 1,
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
   },
   time: {
-    fontSize: '22vw', fontWeight: 200,
+    fontSize: '24vw', fontWeight: 200,
     letterSpacing: '-0.02em', lineHeight: 1,
-    textShadow: '0 0 60px rgba(232, 201, 122, 0.25)',
+    textShadow: '0 0 60px rgba(232,201,122,0.2)',
   },
   date: {
-    fontSize: '3.5vw', opacity: 0.35,
-    marginTop: '2vw', letterSpacing: '0.25em', textTransform: 'uppercase',
+    fontSize: '3vw', opacity: 0.3,
+    marginTop: '1.5vw', letterSpacing: '0.3em', textTransform: 'uppercase',
   },
-  divider: {
-    height: '1px', background: 'var(--border)', flexShrink: 0,
-  },
-  podcastSection: {
+  strip: {
     flexShrink: 0,
-    padding: '3vw 5vw 4vw',
-    display: 'flex', flexDirection: 'column', gap: '2.5vw',
+    padding: '2vw 3vw 3vw',
+    display: 'flex', flexDirection: 'column', gap: '1.5vw',
+    borderTop: '1px solid var(--border)',
   },
-  episodeInfo: {
-    display: 'flex', flexDirection: 'column', gap: '0.8vw',
-  },
-  episodeTitle: {
-    fontSize: '3vw', lineHeight: 1.2,
+  episodeName: {
+    fontSize: '1.6vw', opacity: 0.35, letterSpacing: '0.04em',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
-  podcastName: {
-    fontSize: '2vw', opacity: 0.4, letterSpacing: '0.05em',
-  },
   progressBar: {
-    height: '2px', background: 'var(--border)',
-    borderRadius: '1px', position: 'relative',
+    height: '2px', background: 'var(--border)', position: 'relative',
   },
   progressFill: {
-    position: 'absolute', top: 0, left: 0, height: '100%',
-    background: 'var(--amber-dim)', borderRadius: '1px',
+    position: 'absolute', inset: '0 auto 0 0',
+    background: 'var(--amber-dim)',
     transition: 'width 1s linear',
   },
-  controls: {
-    display: 'flex', gap: '2vw', alignItems: 'center',
+  btnRow: {
+    display: 'flex', gap: '2vw',
   },
   btn: {
-    background: 'none',
+    width: BTN, height: BTN,
     border: '1px solid var(--border)',
+    background: 'var(--surface)',
     color: 'var(--amber)',
-    fontFamily: 'var(--font)',
-    fontSize: '2.8vw',
-    padding: '1.5vw 3vw',
-    borderRadius: '1vw',
+    fontFamily: 'system-ui, sans-serif',
+    fontSize: '3.5vw',
+    borderRadius: '1.2vw',
     cursor: 'pointer',
-    letterSpacing: '0.05em',
-    opacity: 0.75,
-    whiteSpace: 'nowrap',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    opacity: 0.8,
+    flexShrink: 0,
+    letterSpacing: '0.02em',
   },
-  btnPrimary: {
-    flex: 1,
-    opacity: 1,
+  btnOn: {
     background: 'var(--amber-faint)',
     border: '1px solid var(--amber-dim)',
-    fontSize: '3.2vw',
+    opacity: 1,
   },
-  btnDisabled: {
+  btnOff: {
     opacity: 0.2,
     cursor: 'default',
   },
