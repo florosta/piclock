@@ -14,6 +14,9 @@ const ABS = `http://localhost:13378`
 const TOKEN = process.env.ABS_TOKEN!
 const ALARM_SOUND = process.env.ALARM_SOUND || path.join(__dirname, '../sounds/alarm.mp3')
 const ALARMS_FILE = path.join(__dirname, '../alarms.json')
+const HA_URL = process.env.HA_URL
+const HA_TOKEN = process.env.HA_TOKEN
+const HA_SCENE = process.env.HA_SCENE
 
 app.use(express.json())
 
@@ -117,20 +120,18 @@ function fireAlarm(alarm: Alarm) {
   console.log(`Firing alarm: ${alarm.label || alarm.time}`)
   startAlarmAudio()
   broadcast('alarm', { alarm })
+  activateScene()
 }
 
-// HA calls this to trigger the alarm (play sound + show UI)
-app.post('/api/alarm/fire', (req, res) => {
-  const alarm: Alarm = {
-    id: 'ha',
-    label: req.body?.label || 'Alarm',
-    time: new Date().toTimeString().slice(0, 5),
-    days: [],
-    enabled: true,
-  }
-  fireAlarm(alarm)
-  res.json({ ok: true })
-})
+function activateScene() {
+  if (!HA_URL || !HA_TOKEN || !HA_SCENE) return
+  const domain = HA_SCENE.split('.')[0]
+  fetch(`${HA_URL}/api/services/${domain}/turn_on`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entity_id: HA_SCENE }),
+  }).catch(e => console.warn('HA scene call failed:', e.message))
+}
 
 app.post('/api/alarm/dismiss', (_req, res) => {
   stopAlarmAudio()
