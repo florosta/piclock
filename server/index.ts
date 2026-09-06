@@ -1,6 +1,5 @@
 import 'dotenv/config'
 import express from 'express'
-import cors from 'cors'
 import path from 'path'
 import { Readable } from 'stream'
 import { fileURLToPath } from 'url'
@@ -19,9 +18,6 @@ const HA_URL = process.env.HA_URL || 'http://192.168.4.254:8123'
 const HA_TOKEN = process.env.HA_TOKEN
 const HA_LAMP = process.env.HA_LAMP || 'switch.bedroom_daylight'
 
-if (process.env.NODE_ENV !== 'production') {
-  app.use(cors({ origin: 'http://localhost:5173' }))
-}
 app.use(express.json())
 
 // ---------------------------------------------------------------------------
