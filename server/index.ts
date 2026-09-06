@@ -14,9 +14,9 @@ const ABS = `http://localhost:13378`
 const TOKEN = process.env.ABS_TOKEN!
 const ALARM_SOUND = process.env.ALARM_SOUND || path.join(__dirname, '../sounds/alarm.mp3')
 const ALARMS_FILE = path.join(__dirname, '../alarms.json')
-const HA_URL = process.env.HA_URL || 'http://192.168.4.254:8123'
+const HA_URL = process.env.HA_URL
 const HA_TOKEN = process.env.HA_TOKEN
-const HA_LAMP = process.env.HA_LAMP || 'switch.bedroom_daylight'
+const HA_SCENE = process.env.HA_SCENE  // e.g. scene.morning_alarm, script.wake_up, switch.bedroom_daylight
 
 app.use(express.json())
 
@@ -120,16 +120,17 @@ function fireAlarm(alarm: Alarm) {
   console.log(`Firing alarm: ${alarm.label || alarm.time}`)
   startAlarmAudio()
   broadcast('alarm', { alarm })
-  turnOnLamp()
+  activateScene()
 }
 
-function turnOnLamp() {
-  if (!HA_TOKEN) return
-  fetch(`${HA_URL}/api/services/switch/turn_on`, {
+function activateScene() {
+  if (!HA_TOKEN || !HA_URL || !HA_SCENE) return
+  const domain = HA_SCENE.split('.')[0]
+  fetch(`${HA_URL}/api/services/${domain}/turn_on`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ entity_id: HA_LAMP }),
-  }).catch(e => console.warn('HA lamp call failed:', e.message))
+    body: JSON.stringify({ entity_id: HA_SCENE }),
+  }).catch(e => console.warn('HA scene call failed:', e.message))
 }
 
 app.post('/api/alarm/dismiss', (_req, res) => {
