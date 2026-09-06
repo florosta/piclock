@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Alarm } from '../hooks/useAlarms'
+import type { Alarm } from '../types'
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 

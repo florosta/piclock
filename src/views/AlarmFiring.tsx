@@ -1,4 +1,4 @@
-import type { Alarm } from '../hooks/useAlarms'
+import type { Alarm } from '../types'
 
 interface Props {
   alarm: Alarm
@@ -23,7 +23,7 @@ export default function AlarmFiring({ alarm, onDismiss, onSnooze }: Props) {
 const s: Record<string, React.CSSProperties> = {
   root: {
     position: 'fixed', inset: 0, zIndex: 20,
-    background: '#0a0a0a',
+    background: 'var(--bg)',
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
     gap: '4vw',

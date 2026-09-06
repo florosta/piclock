@@ -44,9 +44,10 @@ Bedside clock, podcast radio, and alarm system running on a Raspberry Pi kiosk.
 - Alarms stored in `alarms.json` (JSON array), loaded/saved on each request
 - Scheduler: `setInterval` every 30s, checks time + day match
 - SSE at `/api/events` pushes `alarm` events to browser
-- `POST /api/alarm/fire` — HA webhook; also used for snooze re-fires
-- Audio: `mpv --loop=inf sounds/alarm.mp3` (or `ALARM_SOUND` env override)
+- On fire: plays `mpv --loop=inf sounds/alarm.mp3`, broadcasts SSE, calls HA scene (best-effort)
+- HA scene configured via `HA_URL` + `HA_TOKEN` + `HA_SCENE` env vars — silently skipped if unset
 - One-off alarms (empty `days` array) auto-disable after firing
+- `Alarm` type is canonical in `src/types.ts`; server has a local mirror with a keep-in-sync comment
 
 ## Home Assistant
 

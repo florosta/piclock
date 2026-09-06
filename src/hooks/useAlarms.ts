@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import type { Alarm } from '../types'
 
-export interface Alarm {
-  id: string
-  label: string
-  time: string      // "07:30"
-  days: number[]    // 0=Sun..6=Sat; empty = one-off
-  enabled: boolean
-}
+export type { Alarm }
 
 export function useAlarms(onFire: (alarm: Alarm) => void) {
   const [alarms, setAlarms] = useState<Alarm[]>([])
@@ -63,17 +58,14 @@ export function useAlarms(onFire: (alarm: Alarm) => void) {
     })
   }
 
-  // Next enabled alarm time for display
   const nextAlarm = (() => {
     const now = new Date()
     const nowMins = now.getHours() * 60 + now.getMinutes()
     const today = now.getDay()
-
     let earliest: { minsFromNow: number; alarm: Alarm } | null = null
     for (const alarm of alarms.filter(a => a.enabled)) {
       const [h, m] = alarm.time.split(':').map(Number)
       const alarmMins = h * 60 + m
-
       const days = alarm.days.length > 0 ? alarm.days : [0, 1, 2, 3, 4, 5, 6]
       for (let offset = 0; offset < 7; offset++) {
         const day = (today + offset) % 7

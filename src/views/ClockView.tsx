@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PlayerState } from '../hooks/usePlayer'
-import type { Alarm } from '../hooks/useAlarms'
+import type { Alarm } from '../types'
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -20,15 +20,23 @@ interface Props {
 export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarms }: Props) {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60000)
-    return () => clearInterval(id)
+    const tick = () => setNow(new Date())
+    // Align to the next minute boundary so the display never lags
+    const n = new Date()
+    const msToNext = (60 - n.getSeconds()) * 1000 - n.getMilliseconds()
+    const intervalRef = { id: null as ReturnType<typeof setInterval> | null }
+    const timeout = setTimeout(() => {
+      tick()
+      intervalRef.id = setInterval(tick, 60000)
+    }, msToNext)
+    return () => { clearTimeout(timeout); if (intervalRef.id) clearInterval(intervalRef.id) }
   }, [])
 
   const { currentEpisode, playing, progress, sleepTimer, play, stop, skip, setSleepTimer } = player
 
-  const playIcon = playing
-    ? (sleepTimer !== null ? `☽ ${fmtTimer(sleepTimer)}` : '▶☽')
-    : '▶☽'
+  // Pressing play always arms a 15-min sleep timer — intentional bedtime UX.
+  // At rest the icon is ▶; once the timer is running it shows the countdown.
+  const playIcon = sleepTimer !== null ? `☽ ${fmtTimer(sleepTimer)}` : '▶'
 
   return (
     <div style={s.root}>

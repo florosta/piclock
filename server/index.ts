@@ -48,6 +48,7 @@ app.get('/api/events', (req, res) => {
 // Alarm store
 // ---------------------------------------------------------------------------
 
+// Mirrors src/types.ts Alarm — keep in sync
 interface Alarm {
   id: string
   label: string
@@ -69,7 +70,7 @@ app.get('/api/alarms', (_req, res) => res.json(loadAlarms()))
 
 app.post('/api/alarms', (req, res) => {
   const alarms = loadAlarms()
-  const alarm: Alarm = { id: randomUUID(), enabled: true, ...req.body }
+  const alarm: Alarm = { ...req.body, id: randomUUID(), enabled: req.body.enabled ?? true }
   alarms.push(alarm)
   saveAlarms(alarms)
   res.json(alarm)
@@ -154,14 +155,14 @@ app.post('/api/alarm/snooze', (req, res) => {
 // Alarm scheduler — checks every 30s
 // ---------------------------------------------------------------------------
 
-const firedThisMinute = new Set<string>()
+const firedIds = new Set<string>()
+let lastCheckedMinute = ''
 
 setInterval(() => {
   const now = new Date()
   const minute = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`
 
-  // Clear last minute's fired set when the minute changes
-  if (![...firedThisMinute].some(k => k.startsWith(minute))) firedThisMinute.clear()
+  if (minute !== lastCheckedMinute) { firedIds.clear(); lastCheckedMinute = minute }
 
   for (const alarm of loadAlarms()) {
     if (!alarm.enabled) continue
@@ -169,9 +170,8 @@ setInterval(() => {
     if (now.getHours() !== h || now.getMinutes() !== m) continue
     if (alarm.days.length > 0 && !alarm.days.includes(now.getDay())) continue
 
-    const key = `${minute}-${alarm.id}`
-    if (firedThisMinute.has(key)) continue
-    firedThisMinute.add(key)
+    if (firedIds.has(alarm.id)) continue
+    firedIds.add(alarm.id)
 
     fireAlarm(alarm)
 

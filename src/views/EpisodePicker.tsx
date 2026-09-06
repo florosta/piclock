@@ -72,7 +72,7 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%',
     background: 'var(--surface)',
     borderTop: '1px solid var(--border)',
-    maxHeight: '75vh',
+    maxHeight: '80vh',
     display: 'flex', flexDirection: 'column',
   },
   header: {
