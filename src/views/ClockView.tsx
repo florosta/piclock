@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PlayerState } from '../hooks/usePlayer'
+import type { Alarm } from '../hooks/useAlarms'
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -11,10 +12,12 @@ function fmtTimer(s: number) {
 
 interface Props {
   player: PlayerState
+  nextAlarm: Alarm | null
   onShowPicker: () => void
+  onShowAlarms: () => void
 }
 
-export default function ClockView({ player, onShowPicker }: Props) {
+export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarms }: Props) {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60000)
@@ -36,12 +39,17 @@ export default function ClockView({ player, onShowPicker }: Props) {
       </div>
 
       <div style={s.strip}>
-        <div style={s.episodeName}>
-          {currentEpisode?.title ?? ''}
+        <div style={s.meta}>
+          <div style={s.episodeName}>{currentEpisode?.title ?? ''}</div>
+          {nextAlarm && (
+            <div style={s.nextAlarm}>⏰ {nextAlarm.time}</div>
+          )}
         </div>
+
         <div style={s.progressBar}>
           <div style={{ ...s.progressFill, width: `${progress * 100}%` }} />
         </div>
+
         <div style={s.btnRow}>
           <Sq onClick={() => skip(-20)} disabled={!currentEpisode}>⏪</Sq>
           <Sq onClick={() => { play(); setSleepTimer(15) }} disabled={!currentEpisode} highlight={playing}>
@@ -49,6 +57,7 @@ export default function ClockView({ player, onShowPicker }: Props) {
           </Sq>
           <Sq onClick={stop} disabled={!playing}>⏹</Sq>
           <Sq onClick={onShowPicker}>☰</Sq>
+          <Sq onClick={onShowAlarms} highlight={!!nextAlarm}>⏰</Sq>
         </div>
       </div>
 
@@ -100,21 +109,26 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', gap: '1.5vw',
     borderTop: '1px solid var(--border)',
   },
+  meta: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+  },
   episodeName: {
     fontSize: '1.6vw', opacity: 0.35, letterSpacing: '0.04em',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    flex: 1,
+  },
+  nextAlarm: {
+    fontSize: '1.6vw', opacity: 0.4, letterSpacing: '0.05em',
+    flexShrink: 0, marginLeft: '2vw',
   },
   progressBar: {
     height: '2px', background: 'var(--border)', position: 'relative',
   },
   progressFill: {
     position: 'absolute', inset: '0 auto 0 0',
-    background: 'var(--amber-dim)',
-    transition: 'width 1s linear',
+    background: 'var(--amber-dim)', transition: 'width 1s linear',
   },
-  btnRow: {
-    display: 'flex', gap: '2vw',
-  },
+  btnRow: { display: 'flex', gap: '1.5vw' },
   btn: {
     width: BTN, height: BTN,
     border: '1px solid var(--border)',
@@ -125,17 +139,12 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: '1.2vw',
     cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    opacity: 0.8,
-    flexShrink: 0,
-    letterSpacing: '0.02em',
+    opacity: 0.8, flexShrink: 0,
   },
   btnOn: {
     background: 'var(--amber-faint)',
     border: '1px solid var(--amber-dim)',
     opacity: 1,
   },
-  btnOff: {
-    opacity: 0.2,
-    cursor: 'default',
-  },
+  btnOff: { opacity: 0.2, cursor: 'default' },
 }
