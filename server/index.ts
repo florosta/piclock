@@ -13,7 +13,7 @@ const app = express()
 const PORT = 3000
 const ABS = `http://localhost:13378`
 const TOKEN = process.env.ABS_TOKEN!
-const ALARM_SOUND = process.env.ALARM_SOUND || '/home/florence/alarm.mp3'
+const ALARM_SOUND = process.env.ALARM_SOUND || path.join(__dirname, '../sounds/alarm.mp3')
 const ALARMS_FILE = path.join(__dirname, '../alarms.json')
 
 app.use(cors())
