@@ -8,9 +8,15 @@ export function useAlarms() {
   const [firingAlarm, setFiringAlarm] = useState<Alarm | null>(null)
 
   useEffect(() => {
-    fetch('/api/alarms').then(r => r.json()).then(setAlarms).catch(() => {})
+    function fetchAlarms() {
+      fetch('/api/alarms').then(r => r.json()).then(setAlarms).catch(() => {})
+    }
+
+    fetchAlarms()
 
     const es = new EventSource('/api/events')
+    // Re-fetch on reconnect so alarms stay current after server restarts
+    es.addEventListener('open', () => fetchAlarms())
     es.addEventListener('alarm', (e: MessageEvent) => {
       const { alarm } = JSON.parse(e.data)
       setFiringAlarm(alarm)

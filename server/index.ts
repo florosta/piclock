@@ -69,6 +69,10 @@ function saveAlarms(alarms: Alarm[]) {
 app.get('/api/alarms', (_req, res) => res.json(loadAlarms()))
 
 app.post('/api/alarms', (req, res) => {
+  const { time } = req.body
+  if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) {
+    return res.status(400).json({ error: 'time must be HH:MM' })
+  }
   const alarms = loadAlarms()
   const alarm: Alarm = { ...req.body, id: randomUUID(), enabled: req.body.enabled ?? true }
   alarms.push(alarm)
@@ -99,11 +103,13 @@ let audioProc: ReturnType<typeof spawn> | null = null
 
 function startAlarmAudio() {
   if (!existsSync(ALARM_SOUND)) {
-    console.warn(`Alarm sound not found: ${ALARM_SOUND}`)
+    console.error(`Alarm sound not found: ${ALARM_SOUND}`)
     return
   }
   audioProc?.kill()
   audioProc = spawn('mpv', ['--loop=inf', ALARM_SOUND])
+  audioProc.on('error', e => console.error('mpv failed to start:', e.message))
+  audioProc.stderr?.on('data', (d: Buffer) => console.error('mpv:', d.toString().trim()))
 }
 
 function stopAlarmAudio() {
@@ -164,22 +170,23 @@ setInterval(() => {
 
   if (minute !== lastCheckedMinute) { firedIds.clear(); lastCheckedMinute = minute }
 
-  for (const alarm of loadAlarms()) {
+  const alarms = loadAlarms()
+  const toDisable: string[] = []
+
+  for (const alarm of alarms) {
     if (!alarm.enabled) continue
     const [h, m] = alarm.time.split(':').map(Number)
     if (now.getHours() !== h || now.getMinutes() !== m) continue
     if (alarm.days.length > 0 && !alarm.days.includes(now.getDay())) continue
-
     if (firedIds.has(alarm.id)) continue
+
     firedIds.add(alarm.id)
-
     fireAlarm(alarm)
+    if (alarm.days.length === 0) toDisable.push(alarm.id)
+  }
 
-    // Disable one-off alarms after firing
-    if (alarm.days.length === 0) {
-      const alarms = loadAlarms().map(a => a.id === alarm.id ? { ...a, enabled: false } : a)
-      saveAlarms(alarms)
-    }
+  if (toDisable.length > 0) {
+    saveAlarms(alarms.map(a => toDisable.includes(a.id) ? { ...a, enabled: false } : a))
   }
 }, 30_000)
 

@@ -21,6 +21,8 @@ export interface PlayerState {
 export function usePlayer(): PlayerState {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null)
+  // Ref mirrors state so play() can read the current episode without a stale closure.
+  // Both must be updated together in select(). Do not remove the ref.
   const currentEpisodeRef = useRef<Episode | null>(null)
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)

@@ -20,16 +20,9 @@ interface Props {
 export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarms }: Props) {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
-    const tick = () => setNow(new Date())
-    // Align to the next minute boundary so the display never lags
-    const n = new Date()
-    const msToNext = (60 - n.getSeconds()) * 1000 - n.getMilliseconds()
-    const intervalRef = { id: null as ReturnType<typeof setInterval> | null }
-    const timeout = setTimeout(() => {
-      tick()
-      intervalRef.id = setInterval(tick, 60000)
-    }, msToNext)
-    return () => { clearTimeout(timeout); if (intervalRef.id) clearInterval(intervalRef.id) }
+    // 1s interval: negligible cost, ensures the display is never more than 1s stale
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
   }, [])
 
   const { currentEpisode, playing, progress, sleepTimer, play, stop, skip, setSleepTimer } = player
