@@ -15,8 +15,13 @@ const ABS = `http://localhost:13378`
 const TOKEN = process.env.ABS_TOKEN!
 const ALARM_SOUND = process.env.ALARM_SOUND || path.join(__dirname, '../sounds/alarm.mp3')
 const ALARMS_FILE = path.join(__dirname, '../alarms.json')
+const HA_URL = process.env.HA_URL || 'http://192.168.4.254:8123'
+const HA_TOKEN = process.env.HA_TOKEN
+const HA_LAMP = process.env.HA_LAMP || 'switch.bedroom_daylight'
 
-app.use(cors())
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors({ origin: 'http://localhost:5173' }))
+}
 app.use(express.json())
 
 // ---------------------------------------------------------------------------
@@ -119,6 +124,16 @@ function fireAlarm(alarm: Alarm) {
   console.log(`Firing alarm: ${alarm.label || alarm.time}`)
   startAlarmAudio()
   broadcast('alarm', { alarm })
+  turnOnLamp()
+}
+
+function turnOnLamp() {
+  if (!HA_TOKEN) return
+  fetch(`${HA_URL}/api/services/switch/turn_on`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entity_id: HA_LAMP }),
+  }).catch(e => console.warn('HA lamp call failed:', e.message))
 }
 
 app.post('/api/alarm/fire', (req, res) => {
