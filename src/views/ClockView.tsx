@@ -15,9 +15,10 @@ interface Props {
   nextAlarm: Alarm | null
   onShowPicker: () => void
   onShowAlarms: () => void
+  onShowHA: () => void
 }
 
-export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarms }: Props) {
+export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarms, onShowHA }: Props) {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
     // 1s interval: negligible cost, ensures the display is never more than 1s stale
@@ -59,6 +60,7 @@ export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarm
           <Sq onClick={stop} disabled={!playing}>⏹</Sq>
           <Sq onClick={onShowPicker}>☰</Sq>
           <Sq onClick={onShowAlarms} highlight={!!nextAlarm}>⏰</Sq>
+          <Sq onClick={onShowHA}>⌂</Sq>
         </div>
       </div>
 

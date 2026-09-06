@@ -140,6 +140,51 @@ function activateScene() {
   }).catch(e => console.warn('HA scene call failed:', e.message))
 }
 
+// ---------------------------------------------------------------------------
+// Home Assistant proxy
+// ---------------------------------------------------------------------------
+
+const HA_ENTITIES = [
+  'light.bedroom_left_bedside_light',
+  'light.bedroom_right_bedside_light',
+  'switch.bedroom_daylight',
+  'climate.bedroom',
+  'sensor.bedroom_bedroom_temperature',
+  'sensor.bedroom_bedroom_humidity',
+  'sensor.home_outdoor_temperature',
+  'sensor.home_weather_condition',
+  'weather.forecast_home',
+  'sensor.octopus_energy_electricity_23e5131289_1200021397432_current_rate',
+  'sensor.octopus_energy_electricity_23e5131289_1200021397432_previous_accumulative_cost',
+]
+
+function haHeaders() {
+  return { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' }
+}
+
+app.get('/api/ha/states', async (_req, res) => {
+  if (!HA_URL || !HA_TOKEN) return res.json([])
+  const results = await Promise.all(
+    HA_ENTITIES.map(id =>
+      fetch(`${HA_URL}/api/states/${id}`, { headers: haHeaders() })
+        .then(r => r.json())
+        .catch(() => null)
+    )
+  )
+  res.json(results.filter(Boolean))
+})
+
+app.post('/api/ha/service', async (req, res) => {
+  if (!HA_URL || !HA_TOKEN) return res.status(503).json({ error: 'HA not configured' })
+  const { domain, service, entity_id, data } = req.body
+  const r = await fetch(`${HA_URL}/api/services/${domain}/${service}`, {
+    method: 'POST',
+    headers: haHeaders(),
+    body: JSON.stringify({ entity_id, ...data }),
+  })
+  res.status(r.ok ? 200 : r.status).json({ ok: r.ok })
+})
+
 app.post('/api/alarm/dismiss', (_req, res) => {
   stopAlarmAudio()
   if (snoozeTimer) { clearTimeout(snoozeTimer); snoozeTimer = null }
