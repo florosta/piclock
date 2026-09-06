@@ -1,30 +1,29 @@
 # piclock
 
-Bedside clock, podcast radio, and alarm system for Raspberry Pi. Runs in Chromium kiosk mode on a DSI touchscreen. Managed from the device or any browser on the local network.
+Bedside clock, podcast radio, alarm system, and house control panel for Raspberry Pi. Runs in Chromium kiosk mode on a DSI touchscreen. Accessible from any browser on the local network.
 
 ## Features
 
-- Full-screen clock with date
+- Full-screen clock
 - Podcast playback via [Audiobookshelf](https://www.audiobookshelf.org/)
-- Alarm system with recurring and one-off alarms, snooze, and label support
-- Home Assistant webhook integration (alarm trigger + SAD lamp)
+- Alarm system — recurring and one-off, snooze, label support
+- Home Assistant integration — alarm fires HA scene (SAD lamp etc.), house control panel
 - Auto-dim backlight after 2 minutes of inactivity
-- Accessible from phone/laptop at `http://192.168.4.161:3000`
 
 ## Stack
 
 - **Frontend**: React + TypeScript (Vite)
-- **Backend**: Express — serves frontend, proxies Audiobookshelf, manages alarms, controls backlight
+- **Backend**: Express — serves frontend, proxies ABS and HA, manages alarms, controls backlight
 - **Pi**: labwc (Wayland), Chromium kiosk, kanshi for display rotation
 
 ## Setup
 
 ### Pi prerequisites
 
-- Raspberry Pi running Raspberry Pi OS (labwc desktop)
-- Audiobookshelf running on port 13378
-- Node.js 22 via nvm (`~/.nvm`)
-- `mpv` installed (`sudo apt install mpv`)
+- Raspberry Pi OS (labwc desktop)
+- [Audiobookshelf](https://www.audiobookshelf.org/) on port 13378
+- Node.js 22 via nvm
+- `mpv` (`sudo apt install mpv`)
 
 ### Install
 
@@ -33,25 +32,30 @@ git clone https://github.com/florosta/piclock.git
 cd piclock
 npm install
 cp .env.example .env
-# add your ABS_TOKEN to .env
+# fill in .env
 ```
 
 ### Environment
 
 ```sh
-# .env
 ABS_TOKEN=your_audiobookshelf_api_token
 
-# Optional — defaults to sounds/alarm.mp3 in the project
-# ALARM_SOUND=/path/to/custom/alarm.mp3
+# Home Assistant (optional — features degrade gracefully without these)
+HA_TOKEN=your_ha_long_lived_token
+HA_URL=http://your-ha-host:8123
+HA_SCENE=scene.alarm_wake_up   # fired when alarm rings
+
+# Optional alarm sound override (defaults to sounds/alarm.mp3)
+# ALARM_SOUND=/path/to/custom.mp3
 ```
 
-Get your ABS token: Audiobookshelf → Settings → Users → API Keys.
+Get your ABS token: Audiobookshelf → Settings → Users → API Keys.  
+Get your HA token: HA → Profile → Security → Long-lived access tokens.
 
 ### Dev
 
 ```sh
-npm run dev   # Vite on :5173 + Express on :3000
+npm run dev   # Vite :5173 + Express :3000
 ```
 
 ### Deploy to Pi
@@ -60,55 +64,31 @@ npm run dev   # Vite on :5173 + Express on :3000
 npm run deploy
 ```
 
-Builds, rsyncs to Pi, restarts server, reloads Chromium. Target is hardcoded as `florence@192.168.4.161` in `deploy.sh`.
+Builds, rsyncs to the Pi, restarts the server, reloads Chromium. Target hardcoded as `florence@192.168.4.161` in `deploy.sh`.
 
 ## Alarm system
 
-Alarms are stored in `alarms.json` on the Pi. Manage them via the ⏰ button on the clock screen.
+Manage via the ⏰ button on the clock screen.
 
 - **Recurring**: pick days (Mon–Sun)
-- **One-off**: leave days empty — fires next time that time occurs, then auto-disables
+- **One-off**: leave days empty — fires at next occurrence, then auto-disables
 - **Snooze**: 9 minutes
-- **Sound**: `sounds/alarm.mp3` (generated with ffmpeg, two-tone beep). Override with `ALARM_SOUND` in `.env`
+- **Sound**: `sounds/alarm.mp3` (two-tone beep, ffmpeg-generated). Override with `ALARM_SOUND` in `.env`
+- **HA scene**: when `HA_SCENE` is set, piclock calls HA to activate it on alarm fire (best-effort — alarm still rings if HA is down)
 
-### Home Assistant integration
+## House panel
 
-The Pi exposes a webhook for HA to trigger alarms and chain other actions (e.g. SAD lamp):
+Tap ⌂ on the clock screen. Shows bedroom lights (toggleable), temperatures, weather, and energy usage from Home Assistant.
 
-```
-POST http://192.168.4.161:3000/api/alarm/fire
-Content-Type: application/json
-{ "label": "Morning" }
-```
-
-HA automation example:
-1. **Trigger**: Time — `07:30`
-2. **Action 1**: REST command → `POST /api/alarm/fire`
-3. **Action 2**: Turn on SAD lamp entity
-
-### Alarm endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/alarms` | List alarms |
-| `POST` | `/api/alarms` | Create alarm |
-| `PATCH` | `/api/alarms/:id` | Update alarm (e.g. toggle enabled) |
-| `DELETE` | `/api/alarms/:id` | Delete alarm |
-| `POST` | `/api/alarm/fire` | Trigger alarm now (HA webhook) |
-| `POST` | `/api/alarm/dismiss` | Dismiss firing alarm |
-| `POST` | `/api/alarm/snooze` | Snooze (`{ minutes: 9 }`) |
+To add or remove entities, edit `src/config/ha.ts` — one line per entity, no other files need changing.
 
 ## Backlight
 
-The server reads/writes `/sys/class/backlight/panel_backlight@1/brightness` (max 31). The screen dims to 2/31 after 2 minutes of no touches and restores on the next tap.
+Dims to 2/31 after 2 minutes of no touches, restores on next tap. Controlled via `/sys/class/backlight/panel_backlight@1/brightness`.
 
 ## Pi autostart
 
-`~/.config/labwc/autostart` on the Pi:
-1. Rotates display to landscape (kanshi, 270°)
-2. Starts the Node server (`restart.sh`)
+`~/.config/labwc/autostart`:
+1. Rotates display 270° (kanshi)
+2. Starts Node server (`restart.sh`)
 3. Launches Chromium at `http://localhost:3000`
-
-## Planned
-
-- House control panel: HA entities (lights, temperature, sensors) as a second overlay on the clock screen
