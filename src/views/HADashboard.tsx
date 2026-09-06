@@ -1,10 +1,24 @@
+import { groupBySectionOrdered, HA_ENTITIES } from '../config/ha'
+import type { EntityConfig } from '../config/ha'
 import type { HAState } from '../hooks/useHA'
 
 const WEATHER_ICON: Record<string, string> = {
   'sunny': '☀', 'clear-night': '☾', 'partlycloudy': '⛅', 'cloudy': '☁',
   'rainy': '☂', 'pouring': '☂', 'snowy': '❄', 'snowy-rainy': '❄',
   'fog': '≈', 'windy': '〜', 'lightning': '⚡', 'lightning-rainy': '⚡',
-  'hail': '●', 'exceptional': '!',
+  'hail': '●',
+}
+
+function formatValue(state: string, format?: EntityConfig['format']): string {
+  const n = parseFloat(state)
+  if (isNaN(n) || state === 'unknown' || state === 'unavailable') return '—'
+  switch (format) {
+    case 'temp':     return `${n.toFixed(1)}°`
+    case 'humidity': return `${n.toFixed(0)}%`
+    case 'rate_gbp': return `${(n * 100).toFixed(1)}p`
+    case 'cost_gbp': return `£${n.toFixed(2)}`
+    default:         return String(n)
+  }
 }
 
 interface Props {
@@ -16,29 +30,8 @@ interface Props {
 }
 
 export default function HADashboard({ states, loading, onToggle, onClose, onRefresh }: Props) {
-  function get(id: string) { return states.find(s => s.entity_id === id) }
-  function val(id: string) { return get(id)?.state ?? '—' }
-  function attr(id: string, key: string) { return get(id)?.attributes[key] }
-
-  const bedroomTemp = val('sensor.bedroom_bedroom_temperature')
-  const bedroomHumidity = val('sensor.bedroom_bedroom_humidity')
-  const outdoorTemp = val('sensor.home_outdoor_temperature')
-  const weatherCondition = val('sensor.home_weather_condition')
-  const weatherIcon = WEATHER_ICON[weatherCondition] ?? '?'
-  const currentRate = val('sensor.octopus_energy_electricity_23e5131289_1200021397432_current_rate')
-  const yesterdayCost = val('sensor.octopus_energy_electricity_23e5131289_1200021397432_previous_accumulative_cost')
-  const climateTarget = attr('climate.bedroom', 'temperature') as number | undefined
-  const climateAction = attr('climate.bedroom', 'hvac_action') as string | undefined
-
-  const lights = [
-    { id: 'light.bedroom_left_bedside_light', label: 'Left' },
-    { id: 'light.bedroom_right_bedside_light', label: 'Right' },
-    { id: 'switch.bedroom_daylight', label: 'SAD' },
-  ]
-
-  function fmt(val: string, unit: string) {
-    return val === 'unknown' || val === 'unavailable' || val === '—' ? '—' : `${parseFloat(val).toFixed(1)}${unit}`
-  }
+  const byId = Object.fromEntries(states.map(s => [s.entity_id, s]))
+  const sections = groupBySectionOrdered(HA_ENTITIES)
 
   return (
     <div style={s.overlay} onClick={onClose}>
@@ -47,7 +40,7 @@ export default function HADashboard({ states, loading, onToggle, onClose, onRefr
         <div style={s.header}>
           <span style={s.title}>House</span>
           <div style={s.headerActions}>
-            <button style={s.iconBtn} onClick={onRefresh} title="Refresh">↺</button>
+            <button style={s.iconBtn} onClick={onRefresh}>↺</button>
             <button style={s.iconBtn} onClick={onClose}>✕</button>
           </div>
         </div>
@@ -56,77 +49,81 @@ export default function HADashboard({ states, loading, onToggle, onClose, onRefr
           <div style={s.status}>Loading…</div>
         ) : (
           <div style={s.body}>
-
-            {/* Bedroom */}
-            <div style={s.section}>
-              <div style={s.sectionLabel}>Bedroom</div>
-              <div style={s.row}>
-                {lights.map(({ id, label }) => {
-                  const on = get(id)?.state === 'on'
-                  return (
-                    <button
-                      key={id}
-                      style={{ ...s.tile, ...s.toggleTile, ...(on ? s.tileOn : {}) }}
-                      onClick={() => onToggle(id, get(id)?.state ?? 'off')}
-                    >
-                      <span style={s.tileIcon}>💡</span>
-                      <span style={s.tileLabel}>{label}</span>
-                    </button>
-                  )
-                })}
-                <div style={{ ...s.tile, ...s.dataTile }}>
-                  <span style={s.tileValue}>{fmt(bedroomTemp, '°')}</span>
-                  <span style={s.tileLabel}>{fmt(bedroomHumidity, '%')}</span>
-                </div>
-                {climateTarget !== undefined && (
-                  <div style={{ ...s.tile, ...s.dataTile }}>
-                    <span style={s.tileValue}>{climateTarget}°</span>
-                    <span style={s.tileLabel}>{climateAction ?? 'tado'}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Outside */}
-            <div style={s.section}>
-              <div style={s.sectionLabel}>Outside</div>
-              <div style={s.row}>
-                <div style={{ ...s.tile, ...s.dataTile, flex: 2 }}>
-                  <span style={s.tileIcon}>{weatherIcon}</span>
-                  <span style={s.tileLabel}>{weatherCondition}</span>
-                </div>
-                <div style={{ ...s.tile, ...s.dataTile }}>
-                  <span style={s.tileValue}>{fmt(outdoorTemp, '°')}</span>
-                  <span style={s.tileLabel}>outside</span>
+            {sections.map(([section, entities]) => (
+              <div key={section} style={s.section}>
+                <div style={s.sectionLabel}>{section}</div>
+                <div style={s.row}>
+                  {entities.map(entity => (
+                    <EntityTile
+                      key={entity.id}
+                      config={entity}
+                      haState={byId[entity.id] ?? null}
+                      onToggle={onToggle}
+                    />
+                  ))}
                 </div>
               </div>
-            </div>
-
-            {/* Energy */}
-            <div style={s.section}>
-              <div style={s.sectionLabel}>Energy</div>
-              <div style={s.row}>
-                <div style={{ ...s.tile, ...s.dataTile }}>
-                  <span style={s.tileValue}>
-                    {currentRate !== '—' && currentRate !== 'unknown' ? `${(parseFloat(currentRate) * 100).toFixed(1)}p` : '—'}
-                  </span>
-                  <span style={s.tileLabel}>now /kWh</span>
-                </div>
-                <div style={{ ...s.tile, ...s.dataTile }}>
-                  <span style={s.tileValue}>
-                    {yesterdayCost !== '—' && yesterdayCost !== 'unknown' ? `£${parseFloat(yesterdayCost).toFixed(2)}` : '—'}
-                  </span>
-                  <span style={s.tileLabel}>yesterday</span>
-                </div>
-              </div>
-            </div>
-
+            ))}
           </div>
         )}
 
       </div>
     </div>
   )
+}
+
+function EntityTile({ config, haState, onToggle }: {
+  config: EntityConfig
+  haState: HAState | null
+  onToggle: (id: string, state: string) => void
+}) {
+  const state = haState?.state ?? 'unavailable'
+  const attrs = haState?.attributes ?? {}
+
+  switch (config.type) {
+    case 'toggle': {
+      const on = state === 'on'
+      return (
+        <button
+          style={{ ...s.tile, ...s.toggleTile, ...(on ? s.tileOn : {}) }}
+          onClick={() => onToggle(config.id, state)}
+        >
+          <span style={s.tileIcon}>💡</span>
+          <span style={s.tileLabel}>{config.label}</span>
+        </button>
+      )
+    }
+
+    case 'sensor':
+      return (
+        <div style={{ ...s.tile, ...s.dataTile }}>
+          <span style={s.tileValue}>{formatValue(state, config.format)}</span>
+          <span style={s.tileLabel}>{config.label}</span>
+        </div>
+      )
+
+    case 'weather': {
+      const icon = WEATHER_ICON[state] ?? '?'
+      return (
+        <div style={{ ...s.tile, ...s.dataTile, flex: 2 }}>
+          <span style={s.tileIcon}>{icon}</span>
+          <span style={s.tileLabel}>{state}</span>
+        </div>
+      )
+    }
+
+    case 'climate': {
+      const current = attrs.current_temperature as number | undefined
+      const target = attrs.temperature as number | undefined
+      const action = attrs.hvac_action as string | undefined
+      return (
+        <div style={{ ...s.tile, ...s.dataTile }}>
+          <span style={s.tileValue}>{current !== undefined ? `${current}°` : '—'}</span>
+          <span style={s.tileLabel}>{target !== undefined ? `→ ${target}°` : action ?? config.label}</span>
+        </div>
+      )
+    }
+  }
 }
 
 const TILE = '18vw'
@@ -171,8 +168,7 @@ const s: Record<string, React.CSSProperties> = {
     background: 'var(--amber-faint)', border: '1px solid var(--amber-dim)', opacity: 1,
   },
   dataTile: {
-    border: '1px solid var(--border)', background: 'none',
-    color: 'var(--amber)',
+    border: '1px solid var(--border)', background: 'none', color: 'var(--amber)',
   },
   tileIcon: { fontSize: '5vw', lineHeight: 1 },
   tileValue: { fontSize: '4vw', fontWeight: 200, lineHeight: 1 },

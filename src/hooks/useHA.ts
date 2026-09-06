@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { HA_ENTITY_IDS } from '../config/ha'
 
 export interface HAState {
   entity_id: string
@@ -11,7 +12,7 @@ export function useHA() {
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(() => {
-    fetch('/api/ha/states')
+    fetch(`/api/ha/states?ids=${HA_ENTITY_IDS.join(',')}`)
       .then(r => r.json())
       .then((data: HAState[]) => { setStates(data); setLoading(false) })
       .catch(() => setLoading(false))

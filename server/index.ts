@@ -144,28 +144,16 @@ function activateScene() {
 // Home Assistant proxy
 // ---------------------------------------------------------------------------
 
-const HA_ENTITIES = [
-  'light.bedroom_left_bedside_light',
-  'light.bedroom_right_bedside_light',
-  'switch.bedroom_daylight',
-  'climate.bedroom',
-  'sensor.bedroom_bedroom_temperature',
-  'sensor.bedroom_bedroom_humidity',
-  'sensor.home_outdoor_temperature',
-  'sensor.home_weather_condition',
-  'weather.forecast_home',
-  'sensor.octopus_energy_electricity_23e5131289_1200021397432_current_rate',
-  'sensor.octopus_energy_electricity_23e5131289_1200021397432_previous_accumulative_cost',
-]
-
 function haHeaders() {
   return { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' }
 }
 
-app.get('/api/ha/states', async (_req, res) => {
+app.get('/api/ha/states', async (req, res) => {
   if (!HA_URL || !HA_TOKEN) return res.json([])
+  const ids = String(req.query.ids || '').split(',').map(s => s.trim()).filter(Boolean)
+  if (ids.length === 0) return res.json([])
   const results = await Promise.all(
-    HA_ENTITIES.map(id =>
+    ids.map(id =>
       fetch(`${HA_URL}/api/states/${id}`, { headers: haHeaders() })
         .then(r => r.json())
         .catch(() => null)
