@@ -132,19 +132,6 @@ function turnOnLamp() {
   }).catch(e => console.warn('HA lamp call failed:', e.message))
 }
 
-app.post('/api/alarm/fire', (req, res) => {
-  // HA webhook — fire with a synthetic alarm object
-  const alarm: Alarm = {
-    id: 'external',
-    label: req.body?.label || 'Alarm',
-    time: new Date().toTimeString().slice(0, 5),
-    days: [],
-    enabled: true,
-  }
-  fireAlarm(alarm)
-  res.json({ ok: true })
-})
-
 app.post('/api/alarm/dismiss', (_req, res) => {
   stopAlarmAudio()
   if (snoozeTimer) { clearTimeout(snoozeTimer); snoozeTimer = null }
