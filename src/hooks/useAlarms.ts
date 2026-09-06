@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Alarm } from '../types'
 
 export type { Alarm }
 
-export function useAlarms(onFire: (alarm: Alarm) => void) {
+export function useAlarms() {
   const [alarms, setAlarms] = useState<Alarm[]>([])
-  const onFireRef = useRef(onFire)
-  onFireRef.current = onFire
+  const [firingAlarm, setFiringAlarm] = useState<Alarm | null>(null)
 
   useEffect(() => {
     fetch('/api/alarms').then(r => r.json()).then(setAlarms).catch(() => {})
@@ -14,7 +13,7 @@ export function useAlarms(onFire: (alarm: Alarm) => void) {
     const es = new EventSource('/api/events')
     es.addEventListener('alarm', (e: MessageEvent) => {
       const { alarm } = JSON.parse(e.data)
-      onFireRef.current(alarm)
+      setFiringAlarm(alarm)
     })
     return () => es.close()
   }, [])
@@ -48,6 +47,7 @@ export function useAlarms(onFire: (alarm: Alarm) => void) {
 
   async function dismiss() {
     await fetch('/api/alarm/dismiss', { method: 'POST' })
+    setFiringAlarm(null)
   }
 
   async function snooze(minutes = 9) {
@@ -56,6 +56,7 @@ export function useAlarms(onFire: (alarm: Alarm) => void) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ minutes }),
     })
+    setFiringAlarm(null)
   }
 
   const nextAlarm = (() => {
@@ -79,5 +80,5 @@ export function useAlarms(onFire: (alarm: Alarm) => void) {
     return earliest?.alarm ?? null
   })()
 
-  return { alarms, nextAlarm, addAlarm, toggleAlarm, deleteAlarm, dismiss, snooze }
+  return { alarms, firingAlarm, nextAlarm, addAlarm, toggleAlarm, deleteAlarm, dismiss, snooze }
 }
