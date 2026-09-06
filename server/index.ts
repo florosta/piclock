@@ -4,7 +4,7 @@ import path from 'path'
 import { Readable } from 'stream'
 import { fileURLToPath } from 'url'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { spawn } from 'child_process'
+import { spawn, execSync } from 'child_process'
 import { randomUUID } from 'crypto'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -272,6 +272,31 @@ app.get('/api/stream/:itemId/:ino', async (req, res) => {
     if (val) res.setHeader(key, val)
   }
   Readable.fromWeb(upstream.body as any).pipe(res)
+})
+
+// ---------------------------------------------------------------------------
+// Volume
+// ---------------------------------------------------------------------------
+
+app.get('/api/volume', (_req, res) => {
+  try {
+    const out = execSync('amixer get Master').toString()
+    const match = out.match(/\[(\d+)%\]/)
+    res.json({ value: match ? parseInt(match[1]) : 50, supported: true })
+  } catch {
+    res.json({ value: 50, supported: false })
+  }
+})
+
+app.post('/api/volume', (req, res) => {
+  const { value } = req.body as { value: number }
+  const clamped = Math.round(Math.max(0, Math.min(100, value)))
+  try {
+    execSync(`amixer set Master ${clamped}%`)
+    res.json({ ok: true, value: clamped })
+  } catch {
+    res.json({ ok: false })
+  }
 })
 
 // ---------------------------------------------------------------------------

@@ -8,12 +8,14 @@ Bedside clock, podcast radio, alarm system, and house control panel for Raspberr
 - Podcast playback via [Audiobookshelf](https://www.audiobookshelf.org/)
 - Alarm system — recurring and one-off, snooze, label support
 - Home Assistant integration — alarm fires HA scene (SAD lamp etc.), house control panel
+- Sleep timer — play button arms a 15-minute timer; stop button cancels it
+- Volume controls (system volume via `amixer`)
 - Auto-dim backlight after 2 minutes of inactivity
 
 ## Stack
 
 - **Frontend**: React + TypeScript (Vite)
-- **Backend**: Express — serves frontend, proxies ABS and HA, manages alarms, controls backlight
+- **Backend**: Express — serves frontend, proxies ABS and HA, manages alarms, controls backlight and volume
 - **Pi**: labwc (Wayland), Chromium kiosk, kanshi for display rotation
 
 ## Setup
@@ -85,6 +87,10 @@ To add or remove entities, edit `src/config/ha.ts` — one line per entity, no o
 ## Backlight
 
 Dims to 2/31 after 2 minutes of no touches, restores on next tap. Controlled via `/sys/class/backlight/panel_backlight@1/brightness`.
+
+## Volume
+
+🔉 / 🔊 buttons step system volume by 10% via `amixer set Master`. Requires ALSA (`amixer` must be available on the Pi).
 
 ## Pi autostart
 

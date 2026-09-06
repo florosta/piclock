@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { PlayerState } from '../hooks/usePlayer'
 import type { Alarm } from '../types'
 
@@ -26,7 +26,19 @@ export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarm
     return () => clearInterval(id)
   }, [])
 
-  const { currentEpisode, playing, progress, sleepTimer, play, stop, skip, setSleepTimer } = player
+  const { currentEpisode, playing, progress, sleepTimer, play, stop, skip, setSleepTimer, cancelSleepTimer } = player
+
+  const [volume, setVolume] = useState(50)
+  useEffect(() => {
+    fetch('/api/volume').then(r => r.json()).then(({ value }) => setVolume(value)).catch(() => {})
+  }, [])
+  const adjustVolume = useCallback((delta: number) => {
+    setVolume(prev => {
+      const next = Math.max(0, Math.min(100, prev + delta))
+      fetch('/api/volume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: next }) })
+      return next
+    })
+  }, [])
 
   // Pressing play always arms a 15-min sleep timer — intentional bedtime UX.
   // At rest the icon is ▶; once the timer is running it shows the countdown.
@@ -57,7 +69,9 @@ export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarm
           <Sq onClick={() => { play(); setSleepTimer(15) }} disabled={!currentEpisode} highlight={playing}>
             {playIcon}
           </Sq>
-          <Sq onClick={stop} disabled={!playing}>⏹</Sq>
+          <Sq onClick={() => { stop(); cancelSleepTimer() }} disabled={!playing}>⏹</Sq>
+          <Sq onClick={() => adjustVolume(-10)} disabled={volume <= 0}>🔉</Sq>
+          <Sq onClick={() => adjustVolume(10)} disabled={volume >= 100}>🔊</Sq>
           <Sq onClick={onShowPicker}>☰</Sq>
           <Sq onClick={onShowAlarms} highlight={!!nextAlarm}>⏰</Sq>
           <Sq onClick={onShowHA}>⌂</Sq>
