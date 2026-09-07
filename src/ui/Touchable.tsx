@@ -45,12 +45,6 @@ function useTouchable({ onActivate, disabled, repeat }: Options) {
 
   useEffect(() => clearTimers, [clearTimers])
 
-  const end = useCallback(() => {
-    clearTimers()
-    setPressed(false)
-    origin.current = null
-  }, [clearTimers])
-
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (disabled) return
     origin.current = { x: e.clientX, y: e.clientY }
@@ -69,39 +63,50 @@ function useTouchable({ onActivate, disabled, repeat }: Options) {
     }
   }, [disabled, repeat])
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const start = origin.current
-    if (!start || cancelled.current) return
-    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > DRAG_SLOP) {
-      cancelled.current = true
-      end()
+  // Move and release are watched on the window, not on the button. A press that
+  // travels off the control — scrolling a list, sliding away from a key you
+  // decided against — must both cancel the activation and clear the lit state,
+  // and neither event comes back to the element once the pointer has left it.
+  // Touch pointers are implicitly captured and would return, but a mouse is not,
+  // and on this kiosk the panel may well be presented as a mouse.
+  useEffect(() => {
+    if (!pressed) return
+
+    function move(e: PointerEvent) {
+      const start = origin.current
+      if (!start || cancelled.current) return
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > DRAG_SLOP) {
+        cancelled.current = true
+        clearTimers()
+        setPressed(false)
+      }
     }
-  }, [end])
+    function up() {
+      clearTimers()
+      setPressed(false)
+      origin.current = null
+    }
 
-  const onPointerUp = useCallback(() => end(), [end])
-  const onPointerCancel = useCallback(() => { cancelled.current = true; end() }, [end])
-
-  // Touch pointers are implicitly captured, so pointerup always comes back to
-  // this element and clears the press. A mouse is not captured: drag off a
-  // button and neither move nor up arrives, leaving it stuck lit. Only the
-  // boundary event catches that case.
-  const onPointerLeave = useCallback(() => {
-    if (origin.current) { cancelled.current = true; end() }
-  }, [end])
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+  }, [pressed, clearTimers])
 
   // Activation still runs off click, so keyboard and assistive tech work when
-  // the app is opened from a desktop browser on the LAN. The pointer handlers
-  // above only decide whether that click is allowed to count.
+  // the app is opened from a desktop browser on the LAN. The handlers above
+  // only decide whether that click is allowed to count.
   const onClick = useCallback(() => {
     if (disabled || cancelled.current) return
     if (repeated.current) { repeated.current = false; return }
     activate.current()
   }, [disabled])
 
-  return {
-    pressed,
-    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPointerLeave, onClick },
-  }
+  return { pressed, handlers: { onPointerDown, onClick } }
 }
 
 interface ButtonProps {

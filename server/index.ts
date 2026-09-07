@@ -278,11 +278,33 @@ app.get('/api/stream/:itemId/:ino', async (req, res) => {
 // Volume
 // ---------------------------------------------------------------------------
 
-app.get('/api/volume', (_req, res) => {
+// 'Master' does not exist on every Pi audio setup — a DSI panel with a USB DAC
+// or the headphone jack alone often exposes only 'PCM', 'Headphone' or 'Digital',
+// and amixer then throws, which is why the volume buttons could appear to do
+// nothing. Ask ALSA what controls it actually has and take the first we know.
+const VOLUME_CONTROLS = ['Master', 'PCM', 'Speaker', 'Headphone', 'Digital', 'Playback']
+
+const mixerControl = (() => {
   try {
-    const out = execSync('amixer get Master').toString()
+    const names = [...execSync('amixer scontrols').toString().matchAll(/'([^']+)'/g)].map(m => m[1])
+    return VOLUME_CONTROLS.find(c => names.includes(c)) ?? names[0] ?? null
+  } catch {
+    return null
+  }
+})()
+
+console.log(mixerControl
+  ? `volume: using ALSA control '${mixerControl}'`
+  : 'volume: no ALSA control found — clients will fall back to player gain')
+
+// -M reads and writes the mapped (perceptual) volume, so a slider at 50% sounds
+// like half rather than the near-silence a raw 50% of the dB range gives.
+app.get('/api/volume', (_req, res) => {
+  if (!mixerControl) return res.json({ value: 50, supported: false })
+  try {
+    const out = execSync(`amixer -M get "${mixerControl}"`).toString()
     const match = out.match(/\[(\d+)%\]/)
-    res.json({ value: match ? parseInt(match[1]) : 50, supported: true })
+    res.json({ value: match ? parseInt(match[1]) : 50, supported: true, control: mixerControl })
   } catch {
     res.json({ value: 50, supported: false })
   }
@@ -291,11 +313,13 @@ app.get('/api/volume', (_req, res) => {
 app.post('/api/volume', (req, res) => {
   const { value } = req.body as { value: number }
   const clamped = Math.round(Math.max(0, Math.min(100, value)))
+  if (!mixerControl) return res.json({ ok: false, value: clamped })
   try {
-    execSync(`amixer set Master ${clamped}%`)
+    // unmute alongside the set: a muted control swallows every change silently
+    execSync(`amixer -M set "${mixerControl}" ${clamped}% unmute`)
     res.json({ ok: true, value: clamped })
   } catch {
-    res.json({ ok: false })
+    res.json({ ok: false, value: clamped })
   }
 })
 

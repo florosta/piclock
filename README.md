@@ -9,7 +9,7 @@ Bedside clock, podcast radio, alarm system, and house control panel for Raspberr
 - Alarm system — recurring and one-off, snooze, label support
 - Home Assistant integration — alarm fires HA scene (SAD lamp etc.), house control panel
 - Sleep timer — play button arms a 15-minute timer; stop button cancels it
-- Volume controls (system volume via `amixer`)
+- Volume control — one key showing the level, opening a drag slider (system volume via `amixer`)
 - Auto-dim backlight after 2 minutes of inactivity
 
 ## Stack
@@ -90,11 +90,11 @@ Dims to 2/31 after 2 minutes of no touches, restores on next tap. Controlled via
 
 ## Volume
 
-🔉 / 🔊 buttons step system volume by 10% via `amixer set Master`. Requires ALSA (`amixer` must be available on the Pi).
+Tap the volume key on the clock screen — it shows the current level — and drag the
+slider. The server picks the first ALSA control the Pi actually has (`Master`,
+`PCM`, `Speaker`, `Headphone`, `Digital`), since `Master` does not exist on every
+audio setup, and sets it with `amixer -M` so the slider is perceptually linear.
 
-## Pi autostart
-
-`~/.config/labwc/autostart`:
-1. Rotates display 270° (kanshi)
-2. Starts Node server (`restart.sh`)
-3. Launches Chromium at `http://localhost:3000`
+If no control is found the app says so and falls back to the player's own gain,
+which controls podcast playback but not the alarm. Check what the Pi has with
+`amixer scontrols`; the server logs which one it chose at startup.

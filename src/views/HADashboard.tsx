@@ -4,6 +4,7 @@ import type { HAState } from '../hooks/useHA'
 import Icon from '../ui/Icon'
 import Sheet, { IconButton } from '../ui/Sheet'
 import { s as sheet } from '../ui/styles'
+import Scroller from '../ui/Scroller'
 import Touchable from '../ui/Touchable'
 
 interface Props {
@@ -27,7 +28,7 @@ export default function HADashboard({ states, loading, onToggle, onClose, onRefr
       {loading ? (
         <div style={sheet.status}>Loading…</div>
       ) : (
-        <div className="scroll" style={{ ...sheet.body, minHeight: 0 }}>
+        <Scroller style={{ ...sheet.body, minHeight: 0 }}>
           {sections.map(([section, entities]) => (
             <div key={section} style={s.section}>
               <div style={sheet.sectionLabel}>{section}</div>
@@ -43,7 +44,7 @@ export default function HADashboard({ states, loading, onToggle, onClose, onRefr
               </div>
             </div>
           ))}
-        </div>
+        </Scroller>
       )}
     </Sheet>
   )

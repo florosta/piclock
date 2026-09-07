@@ -4,6 +4,7 @@ import { useEpisodes } from './hooks/useEpisodes'
 import { useBacklight } from './hooks/useBacklight'
 import { useAlarms } from './hooks/useAlarms'
 import { useHA } from './hooks/useHA'
+import { useVolume } from './hooks/useVolume'
 import { CLOCK_ENTITIES } from './config/ha'
 import ClockView from './views/ClockView'
 import EpisodePicker from './views/EpisodePicker'
@@ -16,6 +17,7 @@ export default function App() {
   const episodes = useEpisodes()
   const alarms = useAlarms()
   const ha = useHA()
+  const volume = useVolume(player.audioRef)
   useBacklight()
 
   const [showPicker, setShowPicker] = useState(false)
@@ -34,6 +36,7 @@ export default function App() {
 
       <ClockView
         player={player}
+        volume={volume}
         nextAlarm={alarms.nextAlarm}
         clockEntities={CLOCK_ENTITIES.map(config => ({
           config,

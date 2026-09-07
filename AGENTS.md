@@ -15,6 +15,8 @@ src/
     useEpisodes.ts     — ABS episode fetching
     useAlarms.ts       — alarm CRUD, SSE listener, firingAlarm state, nextAlarm calc
     useBacklight.ts    — auto-dim backlight after 2min inactivity via /api/brightness
+    useVolume.ts       — system volume; throttled writes, falls back to the <audio>
+                         element's gain when the Pi reports no ALSA control
     useHA.ts           — HA state fetching (reads entity IDs from config/ha.ts), toggle,
                          refresh; polls every 10 min because the clock face shows weather
   ui/
@@ -24,6 +26,8 @@ src/
     Touchable.tsx      — every pressable thing: press feedback on pointerdown,
                          drag past 12px cancels the tap, optional hold-to-repeat
     Sheet.tsx          — the one bottom sheet + IconButton
+    Scroller.tsx       — scroll container; native panning for touch pointers,
+                         manual drag + momentum for mouse pointers (see Touch)
     styles.ts          — style fragments shared across sheets (header, label, status)
   views/
     ClockView.tsx      — primary UI: conditions/date line, clock, podcast controls,
@@ -83,6 +87,13 @@ and where each fix lives:
 | Page rubber-bands behind a sheet | `overscroll-behavior: none` / `contain` on `.scroll` |
 | Volume needs eight separate presses | hold-to-repeat (`repeat` prop on `Touchable`) |
 | `<input type="time">` opens a cursor-sized picker | −/+ steppers in `AlarmManager` |
+| Lists will not scroll when the panel is presented as a mouse | `ui/Scroller` drags the container itself for non-touch pointers |
+
+If scrolling ever breaks again, first check what the panel reports:
+`document.addEventListener('pointerdown', e => console.log(e.pointerType))` in the
+kiosk. `mouse` means labwc/Chromium is not treating the DSI panel as a touchscreen
+— `Scroller` covers that case, but `--touch-events=enabled` on the Chromium command
+line in `~/.config/labwc/autostart` is the underlying fix.
 
 ## Pi
 

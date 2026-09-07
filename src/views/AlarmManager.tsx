@@ -3,6 +3,7 @@ import type { Alarm } from '../types'
 import Icon from '../ui/Icon'
 import Sheet from '../ui/Sheet'
 import { s as sheet } from '../ui/styles'
+import Scroller from '../ui/Scroller'
 import Touchable from '../ui/Touchable'
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
@@ -44,7 +45,7 @@ export default function AlarmManager({ alarms, onAdd, onToggle, onDelete, onClos
     // On a 720px-tall screen the add form would sit below the list and need
     // scrolling to reach, so it takes the sheet over instead of appending to it.
     <Sheet title={adding ? 'New alarm' : 'Alarms'} onClose={onClose}>
-      <div className="scroll" style={s.list}>
+      <Scroller style={s.list}>
 
         {adding ? (
           <div style={s.addForm}>
@@ -108,7 +109,7 @@ export default function AlarmManager({ alarms, onAdd, onToggle, onDelete, onClos
           </>
         )}
 
-      </div>
+      </Scroller>
     </Sheet>
   )
 }

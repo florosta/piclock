@@ -3,6 +3,7 @@ import { iconFor, valueFor } from '../config/ha'
 import type { EntityConfig } from '../config/ha'
 import type { HAState } from '../hooks/useHA'
 import type { PlayerState } from '../hooks/usePlayer'
+import type { VolumeState } from '../hooks/useVolume'
 import type { Alarm } from '../types'
 import Icon from '../ui/Icon'
 import type { IconName } from '../ui/Icon'
@@ -23,6 +24,7 @@ export interface ClockEntity {
 
 interface Props {
   player: PlayerState
+  volume: VolumeState
   nextAlarm: Alarm | null
   /** Entities flagged `clock: true` in config/ha.ts — weather and outdoor temp. */
   clockEntities: ClockEntity[]
@@ -32,7 +34,7 @@ interface Props {
 }
 
 export default function ClockView({
-  player, nextAlarm, clockEntities, onShowPicker, onShowAlarms, onShowHA,
+  player, volume, nextAlarm, clockEntities, onShowPicker, onShowAlarms, onShowHA,
 }: Props) {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
@@ -43,27 +45,7 @@ export default function ClockView({
 
   const { currentEpisode, playing, progress, sleepTimer, play, stop, skip, setSleepTimer, cancelSleepTimer } = player
 
-  const [volume, setVolume] = useState(50)
-  const [volumeShown, setVolumeShown] = useState(false)
-  const volumeHide = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    fetch('/api/volume').then(r => r.json()).then(({ value }) => setVolume(value)).catch(() => {})
-    return () => { if (volumeHide.current) clearTimeout(volumeHide.current) }
-  }, [])
-
-  const adjustVolume = useCallback((delta: number) => {
-    setVolume(prev => {
-      const next = Math.max(0, Math.min(100, prev + delta))
-      fetch('/api/volume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: next }) })
-      return next
-    })
-    // The buttons are icons, so the level itself has to show somewhere:
-    // it surfaces in the strip for a moment after each press.
-    setVolumeShown(true)
-    if (volumeHide.current) clearTimeout(volumeHide.current)
-    volumeHide.current = setTimeout(() => setVolumeShown(false), 1600)
-  }, [])
+  const [volumeOpen, setVolumeOpen] = useState(false)
 
   // Pressing play always arms a 15-min sleep timer — intentional bedtime UX.
   // At rest the button is a play mark; once the timer is running it becomes a
@@ -91,15 +73,16 @@ export default function ClockView({
         <div style={s.time}>{pad(now.getHours())}:{pad(now.getMinutes())}</div>
       </div>
 
+      {volumeOpen && <div style={s.dismiss} onPointerDown={() => setVolumeOpen(false)} />}
+
       <div style={s.strip}>
+        {volumeOpen && (
+          <VolumePopover volume={volume} onDone={() => setVolumeOpen(false)} />
+        )}
+
         <div style={s.meta}>
           <div style={s.episodeName}>{currentEpisode?.title ?? ''}</div>
           <div style={s.metaRight}>
-            {volumeShown && (
-              <span style={s.metaItem}>
-                <Icon name="volumeUp" /> {volume}%
-              </span>
-            )}
             {nextAlarm && (
               <span style={s.metaItem}>
                 <Icon name="alarm" /> {nextAlarm.time}
@@ -131,14 +114,87 @@ export default function ClockView({
           </Key>
 
           <Key icon="stop" label="Stop" onClick={() => { stop(); cancelSleepTimer() }} disabled={!playing} />
-          <Key icon="volumeDown" label="Volume down" onClick={() => adjustVolume(-5)} disabled={volume <= 0} repeat />
-          <Key icon="volumeUp" label="Volume up" onClick={() => adjustVolume(5)} disabled={volume >= 100} repeat />
+
+          {/* One volume key rather than two: it carries the level, and opens a
+              slider you can throw to the value you want in a single drag. */}
+          <Key
+            icon="volumeUp"
+            label={`Volume ${volume.value}%`}
+            onClick={() => setVolumeOpen(o => !o)}
+            active={volumeOpen}
+          >
+            <span style={s.stack}>
+              <Icon name={volume.value === 0 ? 'volumeDown' : 'volumeUp'} size="0.7em" />
+              <span style={s.stackText}>{volume.value}%</span>
+            </span>
+          </Key>
+
           <Key icon="list" label="Episodes" onClick={onShowPicker} />
           <Key icon="alarm" label="Alarms" onClick={onShowAlarms} active={!!nextAlarm} />
           <Key icon="home" label="House" onClick={onShowHA} />
         </div>
       </div>
 
+    </div>
+  )
+}
+
+/**
+ * A slider you drag straight to the value, rather than a pair of keys you press
+ * eight times. Pointer-driven rather than <input type="range">: the native
+ * control wants a thumb hit exactly, this takes a press anywhere on the track,
+ * which is the difference between usable and not with a thumb in the dark.
+ *
+ * Closes itself after a few seconds of stillness so it never sits over the clock.
+ */
+function VolumePopover({ volume, onDone }: { volume: VolumeState; onDone: () => void }) {
+  const track = useRef<HTMLDivElement>(null)
+  const dragging = useRef(false)
+  const idle = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const bump = useCallback(() => {
+    if (idle.current) clearTimeout(idle.current)
+    idle.current = setTimeout(onDone, 4000)
+  }, [onDone])
+
+  const setFromX = useCallback((clientX: number) => {
+    const node = track.current
+    if (!node) return
+    const r = node.getBoundingClientRect()
+    volume.set(((clientX - r.left) / r.width) * 100)
+    bump()
+  }, [volume, bump])
+
+  useEffect(() => {
+    bump()
+    function move(e: PointerEvent) { if (dragging.current) setFromX(e.clientX) }
+    function up() { dragging.current = false }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      if (idle.current) clearTimeout(idle.current)
+    }
+  }, [bump, setFromX])
+
+  return (
+    <div style={s.popover} onPointerDown={e => e.stopPropagation()}>
+      <div style={s.popoverHead}>
+        <Icon name={volume.value === 0 ? 'volumeDown' : 'volumeUp'} />
+        <span style={s.popoverValue}>{volume.value}%</span>
+        {!volume.systemVolume && <span style={s.popoverNote}>app only</span>}
+      </div>
+      <div
+        ref={track}
+        style={s.track}
+        onPointerDown={e => { dragging.current = true; setFromX(e.clientX) }}
+      >
+        <div style={s.trackBase} />
+        <div style={{ ...s.trackFill, width: `${volume.value}%` }} />
+      </div>
     </div>
   )
 }
@@ -202,6 +258,7 @@ const s: Record<string, React.CSSProperties> = {
     textShadow: '0 0 60px rgba(232,201,122,0.2)',
   },
   strip: {
+    position: 'relative',
     flexShrink: 0,
     padding: 'var(--s-2) var(--s-4) var(--s-4)',
     display: 'flex', flexDirection: 'column', gap: 'var(--s-2)',
@@ -252,5 +309,66 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 'var(--t-sm)',
     letterSpacing: '0.02em',
     fontVariantNumeric: 'tabular-nums',
+  },
+  stack: {
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: '0.5vw',
+  },
+  stackText: {
+    fontSize: 'var(--t-sm)',
+    fontVariantNumeric: 'tabular-nums',
+  },
+
+  // Catches a press anywhere else on screen so the popover dismisses.
+  dismiss: { position: 'fixed', inset: 0, zIndex: 4 },
+  popover: {
+    position: 'absolute', zIndex: 5,
+    left: '50%', transform: 'translateX(-50%)',
+    bottom: 'calc(100% - var(--s-2))',
+    width: '52vw',
+    background: 'var(--surface)',
+    borderRadius: 'var(--r-lg)',
+    padding: 'var(--s-3)',
+    display: 'flex', flexDirection: 'column', gap: 'var(--s-1)',
+    boxShadow: '0 -1vw 4vw rgba(0,0,0,0.6)',
+  },
+  popoverHead: {
+    display: 'flex', alignItems: 'center', gap: 'var(--s-2)',
+    fontSize: 'var(--t-md)',
+  },
+  popoverValue: {
+    fontSize: 'var(--t-lg)', fontWeight: 200, lineHeight: 1,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  popoverNote: {
+    marginLeft: 'auto',
+    fontSize: 'var(--t-xs)',
+    opacity: 'var(--o-tertiary)',
+    letterSpacing: 'var(--track-label)',
+    textTransform: 'uppercase',
+  },
+  // A tall press target with a slim track drawn inside it: the whole band
+  // takes the press, the visible bar just shows where you landed.
+  track: {
+    height: '7vw',
+    display: 'flex', alignItems: 'center',
+    position: 'relative',
+    touchAction: 'none',
+  },
+  trackBase: {
+    position: 'absolute', inset: 'auto 0', top: '50%',
+    transform: 'translateY(-50%)',
+    height: '2.4vw',
+    background: 'var(--surface-raised)',
+    borderRadius: '999px',
+    pointerEvents: 'none',
+  },
+  trackFill: {
+    position: 'absolute', left: 0, top: '50%',
+    transform: 'translateY(-50%)',
+    height: '2.4vw',
+    background: 'var(--amber-dim)',
+    borderRadius: '999px',
+    pointerEvents: 'none',
   },
 }

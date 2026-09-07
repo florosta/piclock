@@ -103,9 +103,12 @@ input::placeholder { color: var(--text-dim); opacity: 1; }
 
 button { -webkit-user-select: none; user-select: none; }
 
-/* Scrollable regions: momentum, contained overscroll, no visible scrollbar */
+/* Scrollable regions: momentum, contained overscroll, no visible scrollbar.
+   pan-y is stated rather than inherited, so a touch drag is never swallowed
+   by an ancestor's touch-action. See ui/Scroller for the mouse-pointer case. */
 .scroll {
   overflow-y: auto;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   scrollbar-width: none;

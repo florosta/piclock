@@ -3,6 +3,7 @@ import type { Episode } from '../types'
 import Icon from '../ui/Icon'
 import Sheet from '../ui/Sheet'
 import { s as sheet } from '../ui/styles'
+import Scroller from '../ui/Scroller'
 import Touchable from '../ui/Touchable'
 
 function formatDuration(s: number) {
@@ -28,7 +29,7 @@ export default function EpisodePicker({ episodes, currentEpisode, onSelect, onCl
   return (
     <Sheet title="Episodes" onClose={onClose}>
       {/* Rows are separated by the gap between raised fills, not by rules. */}
-      <div className="scroll" style={s.list}>
+      <Scroller style={s.list}>
         {loading && <div style={sheet.status}>Loading…</div>}
         {error && <div style={sheet.status}>{error}</div>}
 
@@ -59,7 +60,7 @@ export default function EpisodePicker({ episodes, currentEpisode, onSelect, onCl
             </Touchable>
           )
         })}
-      </div>
+      </Scroller>
     </Sheet>
   )
 }
