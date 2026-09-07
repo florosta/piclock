@@ -80,14 +80,6 @@ export default function ClockView({
           <VolumePopover volume={volume} onDone={() => setVolumeOpen(false)} />
         )}
 
-        <div style={s.meta}>
-          <div style={s.episodeName}>{currentEpisode?.title ?? ''}</div>
-        </div>
-
-        <div style={s.progressBar}>
-          <div style={{ ...s.progressFill, width: `${progress * 100}%` }} />
-        </div>
-
         <div style={s.btnRow}>
           <Key icon="rewind" label="Back 20 seconds" onClick={() => skip(-20)} disabled={!currentEpisode} repeat />
 
@@ -140,6 +132,15 @@ export default function ClockView({
           </Key>
           <Key icon="home" label="House" onClick={onShowHA} />
         </div>
+
+        <div style={s.nowPlaying}>{currentEpisode?.title ?? ''}</div>
+      </div>
+
+      {/* Full bleed on the very bottom edge, with no track behind it: at rest
+          there is nothing to see, and playing draws a bar across the foot of
+          the screen. */}
+      <div style={s.progressBar}>
+        <div style={{ ...s.progressFill, width: `${progress * 100}%` }} />
       </div>
 
     </div>
@@ -267,27 +268,25 @@ const s: Record<string, React.CSSProperties> = {
   strip: {
     position: 'relative',
     flexShrink: 0,
-    padding: 'var(--s-2) var(--s-4) var(--s-4)',
+    padding: 'var(--s-2) var(--s-4) var(--s-2)',
     display: 'flex', flexDirection: 'column', gap: 'var(--s-2)',
   },
-  meta: {
-    display: 'flex', alignItems: 'center',
-    minHeight: 'var(--t-sm)',
-  },
-  episodeName: {
+  nowPlaying: {
     fontSize: 'var(--t-xs)',
     opacity: 'var(--o-tertiary)',
     letterSpacing: 'var(--track-label)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-    flex: 1,
+    textAlign: 'center',
+    minHeight: 'var(--t-sm)',
   },
   progressBar: {
-    height: '0.3vw', background: 'transparent',
-    borderRadius: '999px', position: 'relative', overflow: 'hidden',
+    flexShrink: 0,
+    height: '0.7vw', background: 'transparent',
+    position: 'relative', overflow: 'hidden',
   },
   progressFill: {
     position: 'absolute', inset: '0 auto 0 0',
-    background: 'var(--amber-dim)', borderRadius: '999px',
+    background: 'var(--amber-dim)',
     transition: 'width 1s linear',
   },
   btnRow: { display: 'flex', gap: 'var(--s-2)' },
