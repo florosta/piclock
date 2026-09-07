@@ -1,44 +1,59 @@
-import { groupBySectionOrdered, HA_ENTITIES, iconFor, valueFor } from '../config/ha'
-import type { EntityConfig } from '../config/ha'
-import type { HAState } from '../hooks/useHA'
+import { configFor, iconFor, sortAreas, sortEntities, valueFor } from '../config/ha'
+import type { DiscoveredEntity, EntityConfig } from '../config/ha'
+import type { HouseState } from '../hooks/useHouse'
 import Icon from '../ui/Icon'
+import Scroller from '../ui/Scroller'
 import Sheet, { IconButton } from '../ui/Sheet'
 import { s as sheet } from '../ui/styles'
-import Scroller from '../ui/Scroller'
 import Touchable from '../ui/Touchable'
 
 interface Props {
-  states: HAState[]
-  loading: boolean
-  onToggle: (entity_id: string, state: string) => void
+  house: HouseState
   onClose: () => void
-  onRefresh: () => void
 }
 
-export default function HADashboard({ states, loading, onToggle, onClose, onRefresh }: Props) {
-  const byId = Object.fromEntries(states.map(s => [s.entity_id, s]))
-  const sections = groupBySectionOrdered(HA_ENTITIES)
+export default function HADashboard({ house, onClose }: Props) {
+  const { areas, loading, configured, refresh, toggle } = house
+
+  // Everything below is derived from what HA reported — no entity, area or
+  // ordering is written down in this repo.
+  const sections = sortAreas(areas).map(({ area, entities }) => {
+    const withConfig = entities
+      .map(entity => ({ entity, config: configFor(entity) }))
+      .filter(({ config }) => config.label)
+    const order = sortEntities(withConfig.map(w => w.config))
+    return {
+      area,
+      items: order
+        .map(config => withConfig.find(w => w.config.id === config.id)!)
+        .filter(Boolean),
+    }
+  }).filter(section => section.items.length > 0)
 
   return (
     <Sheet
       title="House"
       onClose={onClose}
-      actions={<IconButton name="refresh" label="Refresh" onClick={onRefresh} />}
+      actions={<IconButton name="refresh" label="Refresh" onClick={refresh} />}
     >
       {loading ? (
         <div style={sheet.status}>Loading…</div>
+      ) : !configured ? (
+        <div style={sheet.status}>Home Assistant is not configured</div>
+      ) : sections.length === 0 ? (
+        <div style={sheet.status}>Nothing to show</div>
       ) : (
         <Scroller style={{ ...sheet.body, minHeight: 0 }}>
-          {sections.map(([section, entities]) => (
-            <div key={section} style={s.section}>
-              <div style={sheet.sectionLabel}>{section}</div>
+          {sections.map(({ area, items }) => (
+            <div key={area} style={s.section}>
+              <div style={sheet.sectionLabel}>{area}</div>
               <div style={s.row}>
-                {entities.map(entity => (
+                {items.map(({ entity, config }) => (
                   <EntityTile
-                    key={entity.id}
-                    config={entity}
-                    haState={byId[entity.id] ?? null}
-                    onToggle={onToggle}
+                    key={entity.entity_id}
+                    entity={entity}
+                    config={config}
+                    onToggle={toggle}
                   />
                 ))}
               </div>
@@ -50,24 +65,23 @@ export default function HADashboard({ states, loading, onToggle, onClose, onRefr
   )
 }
 
-function EntityTile({ config, haState, onToggle }: {
+function EntityTile({ entity, config, onToggle }: {
+  entity: DiscoveredEntity
   config: EntityConfig
-  haState: HAState | null
-  onToggle: (id: string, state: string) => void
+  onToggle: (entity: DiscoveredEntity) => void
 }) {
-  const state = haState?.state ?? 'unavailable'
-  const attrs = haState?.attributes ?? {}
-  const icon = iconFor(config, state)
+  const icon = iconFor(config, entity.state)
+  const on = entity.state === 'on' || entity.state === 'open' || entity.state === 'unlocked'
 
   if (config.type === 'toggle') {
     return (
       <Touchable
-        onClick={() => onToggle(config.id, state)}
-        active={state === 'on'}
+        onClick={() => onToggle(entity)}
+        active={on}
         style={{ ...s.tile, ...s.toggleTile }}
       >
         <Icon name={icon} style={{ fontSize: 'var(--t-lg)' }} />
-        <span style={sheet.label}>{config.label}</span>
+        <span style={s.tileLabel}>{config.label}</span>
       </Touchable>
     )
   }
@@ -76,17 +90,17 @@ function EntityTile({ config, haState, onToggle }: {
   // words rather than a number, so it takes two columns and a smaller value.
   const wide = config.type === 'weather'
   const label =
-    config.type === 'climate' && attrs.temperature !== undefined
-      ? `${config.label} ${attrs.temperature}°`
+    config.type === 'climate' && entity.attributes.temperature !== undefined
+      ? `${config.label} ${entity.attributes.temperature}°`
       : config.label
 
   return (
     <div style={{ ...s.tile, ...(wide ? s.wideTile : {}) }}>
       <span style={s.tileIcon}><Icon name={icon} /></span>
       <span style={{ ...s.tileValue, ...(wide ? s.wordValue : {}) }}>
-        {valueFor(config, state, attrs)}
+        {valueFor(config, entity.state, entity.attributes, entity.device_class)}
       </span>
-      <span style={sheet.label}>{label}</span>
+      <span style={s.tileLabel}>{label}</span>
     </div>
   )
 }
@@ -111,6 +125,16 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--amber)',
   },
   toggleTile: { opacity: 'var(--o-secondary)' },
+  // HA names entities for the whole house, so labels here run longer than a
+  // hand-written list's ever did — two lines rather than an ellipsis.
+  tileLabel: {
+    fontSize: 'var(--t-xs)',
+    opacity: 'var(--o-tertiary)',
+    letterSpacing: 'var(--track-label)',
+    textAlign: 'center', lineHeight: 1.15,
+    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+    overflow: 'hidden', maxWidth: '100%',
+  },
   wideTile: { gridColumn: 'span 2' },
   wordValue: { fontSize: 'var(--t-md)' },
   tileIcon: { fontSize: 'var(--t-md)', opacity: 'var(--o-tertiary)', display: 'flex' },

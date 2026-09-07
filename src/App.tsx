@@ -4,6 +4,7 @@ import { useEpisodes } from './hooks/useEpisodes'
 import { useBacklight } from './hooks/useBacklight'
 import { useAlarms } from './hooks/useAlarms'
 import { useHA } from './hooks/useHA'
+import { useHouse } from './hooks/useHouse'
 import { useVolume } from './hooks/useVolume'
 import { CLOCK_ENTITIES } from './config/ha'
 import ClockView from './views/ClockView'
@@ -17,6 +18,7 @@ export default function App() {
   const episodes = useEpisodes()
   const alarms = useAlarms()
   const ha = useHA()
+  const house = useHouse()
   const volume = useVolume(player.audioRef)
   useBacklight()
 
@@ -44,7 +46,7 @@ export default function App() {
         }))}
         onShowPicker={() => setShowPicker(true)}
         onShowAlarms={() => setShowAlarms(true)}
-        onShowHA={() => { ha.refresh(); setShowHA(true) }}
+        onShowHA={() => { house.refresh(); setShowHA(true) }}
       />
 
       {showPicker && (
@@ -68,10 +70,7 @@ export default function App() {
 
       {showHA && (
         <HADashboard
-          states={ha.states}
-          loading={ha.loading}
-          onToggle={ha.toggle}
-          onRefresh={ha.refresh}
+          house={house}
           onClose={() => setShowHA(false)}
         />
       )}

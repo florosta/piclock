@@ -17,8 +17,10 @@ src/
     useBacklight.ts    — auto-dim backlight after 2min inactivity via /api/brightness
     useVolume.ts       — system volume; throttled writes, falls back to the <audio>
                          element's gain when the Pi reports no ALSA control
-    useHA.ts           — HA state fetching (reads entity IDs from config/ha.ts), toggle,
-                         refresh; polls every 10 min because the clock face shows weather
+    useHA.ts           — the two entities above the clock (CLOCK_ENTITIES); polls
+                         every 10 min because the clock face shows weather
+    useHouse.ts        — the whole house, discovered from HA and grouped by area;
+                         fetched when the panel opens, and on refresh
   ui/
     Icon.tsx           — the only icon set: inline SVG, 24×24 grid, currentColor
                          solid silhouettes only, holes punched with fill-rule
@@ -36,7 +38,9 @@ src/
     EpisodePicker.tsx  — bottom-sheet episode list
     AlarmManager.tsx   — bottom-sheet alarm CRUD (add/toggle/delete, recurring/one-off)
     AlarmFiring.tsx    — full-screen alarm overlay (dismiss / snooze 9m)
-    HADashboard.tsx    — bottom-sheet house panel; iterates config/ha.ts, renders by EntityType
+    HADashboard.tsx    — bottom-sheet house panel; renders whatever /api/ha/house
+                         reports, grouped by HA area. Nothing about the house is
+                         written down in this repo
   types.ts             — canonical shared types: Episode, Alarm
   App.tsx              — thin orchestration; wires hooks to views, nothing else
 
@@ -129,9 +133,16 @@ line in `~/.config/labwc/autostart` is the underlying fix.
 - HA at `192.168.4.254:8123`
 - `GET /api/ha/states?ids=...` — fetches any entity IDs in parallel from HA
 - `POST /api/ha/service` — proxies `{domain, service, entity_id, data}` to HA services API
-- Entity list lives in `src/config/ha.ts` — add a line to show a new entity. `iconFor`
-  and `valueFor` live there too, so the clock face and the house panel render the
-  same entity identically. Mark an entity `clock: true` to put it above the clock
+- **The house panel is discovered, not configured.** `GET /api/ha/house` returns every
+  entity worth showing, grouped by HA area; add a room or a lamp in Home Assistant and
+  it appears. `configFor` in `src/config/ha.ts` turns a discovered entity into the
+  same `EntityConfig` the rest of the app uses; `AREA_ORDER` pins which rooms come
+  first and `OVERRIDES` relabels or hides a specific entity
+- `CLOCK_ENTITIES` in `src/config/ha.ts` stays explicit — the two readings above the
+  clock are a deliberate choice, not whatever HA happens to return
+- Areas come from HA's area registry, which the REST API does not expose. Rather than
+  take a WebSocket dependency the server asks HA to tell it, via one POST to
+  `/api/template` using `area_name(entity_id)`
 - Alarm scene (`HA_SCENE=scene.alarm_wake_up`) fires SAD lamp on alarm; scene managed in HA UI
 
 ## Server endpoints
@@ -150,6 +161,7 @@ line in `~/.config/labwc/autostart` is the underlying fix.
 | POST | `/api/alarm/snooze` | Stop audio, re-fire in `{minutes}` |
 | GET | `/api/events` | SSE stream (`alarm` event) |
 | GET | `/api/ha/states?ids=` | Fetch HA entity states |
+| GET | `/api/ha/house` | Every entity worth showing, grouped by HA area |
 | POST | `/api/ha/service` | Call HA service |
 
 ## Dev workflow

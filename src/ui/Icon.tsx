@@ -22,11 +22,13 @@ export type IconName =
   | 'chevronUp' | 'chevronDown'
   | 'toggleOn' | 'toggleOff'
   | 'bulb' | 'thermometer' | 'droplet' | 'radiator' | 'bolt' | 'coin'
+  | 'door' | 'person'
   | 'sun' | 'cloud' | 'cloudSun' | 'rain' | 'snow' | 'fog' | 'wind' | 'unknown'
 
 /** Icons whose holes need evenodd rather than nonzero winding. */
 const EVENODD = new Set<IconName>([
   'alarm', 'home', 'toggleOn', 'toggleOff', 'coin', 'unknown', 'bulb', 'radiator',
+  'door',
 ])
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -81,6 +83,10 @@ const PATHS: Record<IconName, React.ReactNode> = {
   // humidity droplet, and the two sit side by side in the Bedroom section.
   radiator: <path d="M2.6 3.8h18.8v14.4H2.6zm3.1 2.9v8.6h1.9V6.7zm4.4 0v8.6h1.9V6.7zm4.4 0v8.6h1.9V6.7zM4.6 19.4h2.2v2.8H4.6zm12.6 0h2.2v2.8h-2.2z" />,
   bolt: <path d="M14.2 1.8 4.6 14.2h5.6l-.6 8 9.8-12.8h-5.8z" />,
+  // Openings — door, window, garage. A frame with a handle punched out.
+  door: <path d="M4.4 1.8h15.2v20.4H4.4zm3 3v14.4h9.2V4.8zm7 6.2v2.4h-1.9v-2.4z" />,
+  // Presence — motion, occupancy, someone home.
+  person: <path d="M12 1.8a4.2 4.2 0 1 1 0 8.4 4.2 4.2 0 0 1 0-8.4zm0 10.2c4.4 0 8 2.6 8 5.8v4.2H4V17.8c0-3.2 3.6-5.8 8-5.8z" />,
   coin: <path d="M1.8 5.2h20.4v13.6H1.8zm10.2 3.4a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" />,
 
   // ── weather ────────────────────────────────────────────────────────────

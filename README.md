@@ -7,7 +7,7 @@ Bedside clock, podcast radio, alarm system, and house control panel for Raspberr
 - Full-screen clock
 - Podcast playback via [Audiobookshelf](https://www.audiobookshelf.org/)
 - Alarm system — recurring and one-off, snooze, label support
-- Home Assistant integration — alarm fires HA scene (SAD lamp etc.), house control panel
+- Home Assistant integration — alarm fires HA scene (SAD lamp etc.), house panel discovered from HA areas
 - Sleep timer — play button arms a 15-minute timer; stop button cancels it
 - Volume control — one key showing the level, opening a drag slider (system volume via `amixer`)
 - Auto-dim backlight after 2 minutes of inactivity
@@ -80,9 +80,18 @@ Manage via the ⏰ button on the clock screen.
 
 ## House panel
 
-Tap ⌂ on the clock screen. Shows bedroom lights (toggleable), temperatures, weather, and energy usage from Home Assistant.
+Tap the house key on the clock screen. It asks Home Assistant what exists and shows
+it grouped by area — lights, switches, covers and locks you can tap, plus
+temperatures, humidity, power, doors and windows as readings. Add a room or a lamp
+in Home Assistant and it turns up here; nothing in this repo needs changing.
 
-To add or remove entities, edit `src/config/ha.ts` — one line per entity, no other files need changing.
+Noise is filtered server-side: only domains a bedside panel can use, and only
+sensors carrying a unit or a device class worth a tile. To pin the order rooms
+appear in, or to relabel or hide a specific entity, edit `AREA_ORDER` and
+`OVERRIDES` in `src/config/ha.ts`.
+
+The two readings above the clock are separate and deliberate — `CLOCK_ENTITIES` in
+the same file.
 
 ## Backlight
 
