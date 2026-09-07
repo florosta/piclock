@@ -240,8 +240,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   above: {
     display: 'flex', alignItems: 'center', gap: 'var(--s-4)',
-    fontSize: 'var(--t-sm)',
-    opacity: 'var(--o-tertiary)',
+    fontSize: 'var(--t-md)',
+    opacity: 'var(--o-primary)',
     letterSpacing: 'var(--track-wide)',
     textTransform: 'uppercase',
   },
@@ -286,7 +286,7 @@ const s: Record<string, React.CSSProperties> = {
     letterSpacing: 'var(--track-label)',
   },
   progressBar: {
-    height: '0.3vw', background: 'var(--surface-track)',
+    height: '0.3vw', background: 'transparent',
     borderRadius: '999px', position: 'relative', overflow: 'hidden',
   },
   progressFill: {
