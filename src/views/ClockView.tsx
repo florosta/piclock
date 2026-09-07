@@ -82,13 +82,6 @@ export default function ClockView({
 
         <div style={s.meta}>
           <div style={s.episodeName}>{currentEpisode?.title ?? ''}</div>
-          <div style={s.metaRight}>
-            {nextAlarm && (
-              <span style={s.metaItem}>
-                <Icon name="alarm" /> {nextAlarm.time}
-              </span>
-            )}
-          </div>
         </div>
 
         <div style={s.progressBar}>
@@ -130,7 +123,21 @@ export default function ClockView({
           </Key>
 
           <Key icon="list" label="Episodes" onClick={onShowPicker} />
-          <Key icon="alarm" label="Alarms" onClick={onShowAlarms} active={!!nextAlarm} />
+          {/* The key is the indicator: lit when an alarm is set, and carrying
+              the time it will go off. */}
+          <Key
+            icon="alarm"
+            label={nextAlarm ? `Alarms, next at ${nextAlarm.time}` : 'Alarms'}
+            onClick={onShowAlarms}
+            active={!!nextAlarm}
+          >
+            {nextAlarm ? (
+              <span style={s.stack}>
+                <Icon name="alarm" size="0.7em" />
+                <span style={s.stackText}>{nextAlarm.time}</span>
+              </span>
+            ) : null}
+          </Key>
           <Key icon="home" label="House" onClick={onShowHA} />
         </div>
       </div>
@@ -264,7 +271,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', gap: 'var(--s-2)',
   },
   meta: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    display: 'flex', alignItems: 'center',
     minHeight: 'var(--t-sm)',
   },
   episodeName: {
@@ -273,17 +280,6 @@ const s: Record<string, React.CSSProperties> = {
     letterSpacing: 'var(--track-label)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     flex: 1,
-  },
-  metaRight: {
-    display: 'flex', alignItems: 'center', gap: 'var(--s-3)',
-    flexShrink: 0, marginLeft: 'var(--s-3)',
-  },
-  metaItem: {
-    display: 'flex', alignItems: 'center', gap: '0.6vw',
-    fontVariantNumeric: 'tabular-nums',
-    fontSize: 'var(--t-xs)',
-    opacity: 'var(--o-secondary)',
-    letterSpacing: 'var(--track-label)',
   },
   progressBar: {
     height: '0.3vw', background: 'transparent',
