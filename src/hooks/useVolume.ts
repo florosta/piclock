@@ -3,13 +3,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 /**
  * System volume, with a fallback.
  *
- * The server drives ALSA. If the Pi has no usable mixer control it says so
- * (`supported: false`), and rather than presenting a control that silently does
- * nothing we fall back to the <audio> element's own gain — which at least
- * controls the podcast, the only thing this app plays through the browser.
+ * The server drives the PipeWire sink (or an ALSA control, if that is all the Pi
+ * has). If it finds neither it says so — `supported: false` — and rather than
+ * presenting a control that silently does nothing we fall back to the <audio>
+ * element's own gain, which at least covers the podcast.
+ *
+ * That fallback is a substitute, never a second stage. When the server is
+ * driving the sink the element stays wide open: attenuating in both places
+ * multiplies (80% sink x 80% element = 64%), so the podcast would sit quieter
+ * than the alarm at every setting and disappear at low ones — and mpv plays the
+ * alarm straight to the same sink, so it would never match.
  *
  * Writes are optimistic and throttled: dragging the slider must feel immediate,
- * but must not shell out to amixer on every animation frame.
+ * but must not shell out on every animation frame.
  */
 
 const WRITE_MS = 120
@@ -60,14 +66,19 @@ export function useVolume(audioRef: React.RefObject<HTMLAudioElement | null>): V
   const set = useCallback((next: number) => {
     const clamped = Math.max(0, Math.min(100, Math.round(next)))
     setValue(clamped)
-    if (audioRef.current) audioRef.current.volume = clamped / 100
     pending.current = clamped
     if (timer.current === null) {
       // Send the first move immediately, then at most one write per WRITE_MS.
       flush()
       timer.current = setTimeout(flush, WRITE_MS)
     }
-  }, [audioRef, flush])
+  }, [flush])
+
+  // One place owns the element's gain, so it also corrects itself if the server
+  // turns out not to support system volume after the first write.
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = systemVolume ? 1 : value / 100
+  }, [audioRef, systemVolume, value])
 
   return { value, systemVolume, set }
 }
