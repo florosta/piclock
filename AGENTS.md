@@ -51,6 +51,12 @@ restart.sh             — Pi-side server restart (used by deploy.sh and labwc a
   spacing (`--s-1`…`--s-5`), radii (`--r-*`), opacity (`--o-full`…`--o-disabled`).
   No raw `vw` font sizes or one-off opacities in a view — add a token instead
 - Dark amber palette: `--amber: #e8c97a`, `--bg: #0a0a0a`
+- Two faces, self-hosted in `public/fonts` (the kiosk must never need the network
+  to draw its own clock): `--font-display` (Alien Block) for the clock face and
+  the firing alarm only, `--font` (Space Grotesk) for everything else.
+  Alien Block's glyphs are drawn wider than their advance width, so `--t-display`
+  is measured against rendered pixels, not calculated — re-measure if either the
+  face or `--track-display` changes
 - Anything pressable goes through `ui/Touchable` — never a bare `<button onClick>`,
   or it will behave like a cursor target rather than a touch target
 - Anything symbolic goes through `ui/Icon` — never a glyph or an emoji in a string

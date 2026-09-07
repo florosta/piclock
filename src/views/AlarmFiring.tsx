@@ -41,8 +41,11 @@ const s: Record<string, React.CSSProperties> = {
   },
   icon: { fontSize: 'var(--t-lg)', opacity: 'var(--o-secondary)' },
   time: {
+    fontFamily: 'var(--font-display)',
     fontSize: 'var(--t-jumbo)', fontWeight: 200,
-    letterSpacing: '-0.03em', lineHeight: 1,
+    letterSpacing: 'var(--track-display)',
+    marginRight: 'calc(var(--track-display) * -1)',
+    lineHeight: 1,
     color: 'var(--amber)',
     textShadow: '0 0 80px rgba(232,201,122,0.4)',
   },

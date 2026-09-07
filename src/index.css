@@ -1,3 +1,16 @@
+/* Self-hosted: the kiosk must be able to draw its own clock with no network.
+   font-display:block avoids a flash of fallback digits on boot. */
+@font-face {
+  font-family: 'Alien Block';
+  src: url('/fonts/alienblock.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/spacegrotesk.woff2') format('woff2');
+  font-weight: 300 700; font-style: normal; font-display: block;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -10,7 +23,14 @@
   --amber-dim: rgba(232, 201, 122, 0.4);
   --amber-faint: rgba(232, 201, 122, 0.12);
   --text-dim: rgba(232, 201, 122, 0.5);
-  --font: 'Courier New', monospace;
+  --font: 'Space Grotesk', system-ui, sans-serif;
+  /* The big numerals only — clock face and firing alarm. Alien Block's glyphs
+     are drawn wider than their advance width, so at this tracking they fuse
+     into one slab: that is the look, not a bug. It also means the painted ink
+     is wider than the text box, so --t-display below is measured against the
+     rendered pixels rather than calculated from the advance width. */
+  --font-display: 'Alien Block', var(--font);
+  --track-display: 0.05em;
 
   /* Opacity scale — one ladder for every de-emphasised element */
   --o-full: 1;
@@ -20,8 +40,8 @@
   --o-disabled: 0.18;
 
   /* Type scale — every font-size in the app comes from here */
-  --t-display: 28vw;   /* the clock */
-  --t-jumbo: 15vw;     /* alarm-firing time */
+  --t-display: 28vw;   /* the clock — measured: fills 1280px edge to edge */
+  --t-jumbo: 20vw;     /* alarm-firing time */
   --t-xl: 6vw;         /* alarm rows, big numerals */
   --t-lg: 4vw;         /* sheet values */
   --t-md: 2.8vw;       /* body text, buttons */

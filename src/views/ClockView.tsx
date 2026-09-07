@@ -157,8 +157,11 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center', justifyContent: 'center',
   },
   time: {
+    fontFamily: 'var(--font-display)',
     fontSize: 'var(--t-display)', fontWeight: 200,
-    letterSpacing: '-0.03em', lineHeight: 1,
+    letterSpacing: 'var(--track-display)',
+    marginRight: 'calc(var(--track-display) * -1)',
+    lineHeight: 1,
     textShadow: '0 0 60px rgba(232,201,122,0.2)',
   },
   date: {
@@ -191,6 +194,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   metaItem: {
     display: 'flex', alignItems: 'center', gap: '0.6vw',
+    fontVariantNumeric: 'tabular-nums',
     fontSize: 'var(--t-xs)',
     opacity: 'var(--o-secondary)',
     letterSpacing: 'var(--track-label)',
