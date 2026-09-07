@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { iconFor, valueFor } from '../config/ha'
+import type { EntityConfig } from '../config/ha'
+import type { HAState } from '../hooks/useHA'
 import type { PlayerState } from '../hooks/usePlayer'
 import type { Alarm } from '../types'
 import Icon from '../ui/Icon'
@@ -13,15 +16,24 @@ function fmtTimer(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
+export interface ClockEntity {
+  config: EntityConfig
+  state: HAState | null
+}
+
 interface Props {
   player: PlayerState
   nextAlarm: Alarm | null
+  /** Entities flagged `clock: true` in config/ha.ts — weather and outdoor temp. */
+  clockEntities: ClockEntity[]
   onShowPicker: () => void
   onShowAlarms: () => void
   onShowHA: () => void
 }
 
-export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarms, onShowHA }: Props) {
+export default function ClockView({
+  player, nextAlarm, clockEntities, onShowPicker, onShowAlarms, onShowHA,
+}: Props) {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
     // 1s interval: negligible cost, ensures the display is never more than 1s stale
@@ -62,8 +74,21 @@ export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarm
     <div style={s.root}>
 
       <div style={s.clock}>
+        {/* Conditions and date sit above the numerals: read the room first,
+            then the time, which is the thing your eye lands on anyway. */}
+        <div style={s.above}>
+          {clockEntities.map(({ config, state }) => (
+            <span key={config.id} style={s.aboveItem}>
+              <Icon name={iconFor(config, state?.state ?? 'unavailable')} />
+              {valueFor(config, state?.state ?? 'unavailable', state?.attributes ?? {})}
+            </span>
+          ))}
+          <span style={s.aboveItem}>
+            {DAYS[now.getDay()]} {now.getDate()} {MONTHS[now.getMonth()]}
+          </span>
+        </div>
+
         <div style={s.time}>{pad(now.getHours())}:{pad(now.getMinutes())}</div>
-        <div style={s.date}>{DAYS[now.getDay()]} {now.getDate()} {MONTHS[now.getMonth()]}</div>
       </div>
 
       <div style={s.strip}>
@@ -155,6 +180,18 @@ const s: Record<string, React.CSSProperties> = {
     flex: 1, minHeight: 0,
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
+    gap: 'var(--s-2)',
+  },
+  above: {
+    display: 'flex', alignItems: 'center', gap: 'var(--s-4)',
+    fontSize: 'var(--t-sm)',
+    opacity: 'var(--o-tertiary)',
+    letterSpacing: 'var(--track-wide)',
+    textTransform: 'uppercase',
+  },
+  aboveItem: {
+    display: 'flex', alignItems: 'center', gap: '0.7vw',
+    fontVariantNumeric: 'tabular-nums',
   },
   time: {
     fontFamily: 'var(--font-display)',
@@ -164,18 +201,10 @@ const s: Record<string, React.CSSProperties> = {
     lineHeight: 1,
     textShadow: '0 0 60px rgba(232,201,122,0.2)',
   },
-  date: {
-    fontSize: 'var(--t-sm)',
-    opacity: 'var(--o-tertiary)',
-    marginTop: 'var(--s-2)',
-    letterSpacing: 'var(--track-wide)',
-    textTransform: 'uppercase',
-  },
   strip: {
     flexShrink: 0,
     padding: 'var(--s-2) var(--s-4) var(--s-4)',
     display: 'flex', flexDirection: 'column', gap: 'var(--s-2)',
-    borderTop: '1px solid var(--border)',
   },
   meta: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -200,7 +229,7 @@ const s: Record<string, React.CSSProperties> = {
     letterSpacing: 'var(--track-label)',
   },
   progressBar: {
-    height: '0.3vw', background: 'var(--border)',
+    height: '0.3vw', background: 'var(--surface-track)',
     borderRadius: '999px', position: 'relative', overflow: 'hidden',
   },
   progressFill: {

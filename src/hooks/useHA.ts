@@ -7,6 +7,11 @@ export interface HAState {
   attributes: Record<string, unknown>
 }
 
+/** The clock face shows weather, so HA is polled rather than fetched only when
+ *  the house panel opens. Ten minutes: outdoor temperature and conditions do
+ *  not move faster than that, and the Pi should not be chattering at HA. */
+const POLL_MS = 10 * 60 * 1000
+
 export function useHA() {
   const [states, setStates] = useState<HAState[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,7 +23,11 @@ export function useHA() {
       .catch(() => setLoading(false))
   }, [])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => {
+    refresh()
+    const id = setInterval(refresh, POLL_MS)
+    return () => clearInterval(id)
+  }, [refresh])
 
   const toggle = useCallback(async (entity_id: string, currentState: string) => {
     const domain = entity_id.split('.')[0]

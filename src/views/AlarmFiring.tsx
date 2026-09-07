@@ -60,7 +60,6 @@ const s: Record<string, React.CSSProperties> = {
     gap: 'var(--s-2)',
     fontSize: 'var(--t-md)',
     padding: 'var(--s-3) var(--s-5)',
-    background: 'none',
     letterSpacing: 'var(--track-label)',
   },
 }

@@ -15,17 +15,20 @@ src/
     useEpisodes.ts     — ABS episode fetching
     useAlarms.ts       — alarm CRUD, SSE listener, firingAlarm state, nextAlarm calc
     useBacklight.ts    — auto-dim backlight after 2min inactivity via /api/brightness
-    useHA.ts           — HA state fetching (reads entity IDs from config/ha.ts), toggle, refresh
+    useHA.ts           — HA state fetching (reads entity IDs from config/ha.ts), toggle,
+                         refresh; polls every 10 min because the clock face shows weather
   ui/
     Icon.tsx           — the only icon set: inline SVG, 24×24 grid, currentColor
-                         solid marks for transport, line marks for everything else
-                         no emoji anywhere — Chromium renders them in colour
+                         solid silhouettes only, holes punched with fill-rule
+                         evenodd. No strokes, no emoji
     Touchable.tsx      — every pressable thing: press feedback on pointerdown,
                          drag past 12px cancels the tap, optional hold-to-repeat
     Sheet.tsx          — the one bottom sheet + IconButton
     styles.ts          — style fragments shared across sheets (header, label, status)
   views/
-    ClockView.tsx      — primary UI: clock + podcast controls + alarm/house buttons
+    ClockView.tsx      — primary UI: conditions/date line, clock, podcast controls,
+                         alarm/house buttons. Entities in the line above the clock
+                         are whatever config/ha.ts marks `clock: true`
     EpisodePicker.tsx  — bottom-sheet episode list
     AlarmManager.tsx   — bottom-sheet alarm CRUD (add/toggle/delete, recurring/one-off)
     AlarmFiring.tsx    — full-screen alarm overlay (dismiss / snooze 9m)
@@ -51,6 +54,10 @@ restart.sh             — Pi-side server restart (used by deploy.sh and labwc a
   spacing (`--s-1`…`--s-5`), radii (`--r-*`), opacity (`--o-full`…`--o-disabled`).
   No raw `vw` font sizes or one-off opacities in a view — add a token instead
 - Dark amber palette: `--amber: #e8c97a`, `--bg: #0a0a0a`
+- **No strokes anywhere.** There is no `--border` token: depth comes from stacked
+  fills (`--bg` → `--surface` → `--surface-raised`), and separation between rows or
+  tiles comes from the gap between them. Icons are solid silhouettes for the same
+  reason. If something needs to stand apart, raise it a step or space it
 - Two faces, self-hosted in `public/fonts` (the kiosk must never need the network
   to draw its own clock): `--font-display` (Alien Block) for the clock face and
   the firing alarm only, `--font` (Space Grotesk) for everything else.
@@ -111,7 +118,9 @@ and where each fix lives:
 - HA at `192.168.4.254:8123`
 - `GET /api/ha/states?ids=...` — fetches any entity IDs in parallel from HA
 - `POST /api/ha/service` — proxies `{domain, service, entity_id, data}` to HA services API
-- Entity list for the dashboard lives in `src/config/ha.ts` — add a line to show a new entity
+- Entity list lives in `src/config/ha.ts` — add a line to show a new entity. `iconFor`
+  and `valueFor` live there too, so the clock face and the house panel render the
+  same entity identically. Mark an entity `clock: true` to put it above the clock
 - Alarm scene (`HA_SCENE=scene.alarm_wake_up`) fires SAD lamp on alarm; scene managed in HA UI
 
 ## Server endpoints

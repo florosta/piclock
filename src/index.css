@@ -15,10 +15,12 @@
 
 :root {
   /* Palette */
-  --bg: #0a0a0a;
-  --surface: #141414;
-  --surface-raised: #1c1c1c;
-  --border: #222;
+  /* Depth comes from stacked fills, never from strokes. There is deliberately
+     no --border token: if an element needs separating, raise it a step. */
+  --bg: #0a0a0a;         /* the page */
+  --surface: #151515;    /* sheets and panels sitting on the page */
+  --surface-raised: #202020;  /* buttons, tiles, rows sitting on a sheet */
+  --surface-track: #262626;   /* progress tracks, grips — a fill, not a rule */
   --amber: #e8c97a;
   --amber-dim: rgba(232, 201, 122, 0.4);
   --amber-faint: rgba(232, 201, 122, 0.12);
@@ -95,6 +97,9 @@ button, input {
   color: var(--amber);
   touch-action: manipulation;
 }
+
+input { caret-color: var(--amber); }
+input::placeholder { color: var(--text-dim); opacity: 1; }
 
 button { -webkit-user-select: none; user-select: none; }
 

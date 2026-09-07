@@ -1,51 +1,10 @@
-import { groupBySectionOrdered, HA_ENTITIES } from '../config/ha'
+import { groupBySectionOrdered, HA_ENTITIES, iconFor, valueFor } from '../config/ha'
 import type { EntityConfig } from '../config/ha'
 import type { HAState } from '../hooks/useHA'
 import Icon from '../ui/Icon'
-import type { IconName } from '../ui/Icon'
 import Sheet, { IconButton } from '../ui/Sheet'
 import { s as sheet } from '../ui/styles'
 import Touchable from '../ui/Touchable'
-
-const WEATHER_ICON: Record<string, IconName> = {
-  'sunny': 'sun', 'clear-night': 'moon', 'partlycloudy': 'cloudSun', 'cloudy': 'cloud',
-  'rainy': 'rain', 'pouring': 'rain', 'snowy': 'snow', 'snowy-rainy': 'snow',
-  'fog': 'fog', 'windy': 'wind', 'lightning': 'bolt', 'lightning-rainy': 'bolt',
-  'hail': 'snow',
-}
-
-const WEATHER_LABEL: Record<string, string> = {
-  'partlycloudy': 'Partly cloudy', 'clear-night': 'Clear', 'snowy-rainy': 'Sleet',
-  'lightning-rainy': 'Thunder', 'pouring': 'Heavy rain', 'exceptional': 'Extreme',
-}
-
-const SENSOR_ICON: Record<string, IconName> = {
-  temp: 'thermometer', humidity: 'droplet', rate_gbp: 'bolt', cost_gbp: 'coin',
-}
-
-/** Icons come from the entity's own type and format, so config/ha.ts stays
- *  a single line per entity. Set `icon` there to override. */
-function iconFor(config: EntityConfig, state: string): IconName {
-  if (config.icon) return config.icon
-  switch (config.type) {
-    case 'toggle':  return 'bulb'
-    case 'climate': return 'flame'
-    case 'weather': return WEATHER_ICON[state] ?? 'unknown'
-    case 'sensor':  return SENSOR_ICON[config.format ?? ''] ?? 'unknown'
-  }
-}
-
-function formatValue(state: string, format?: EntityConfig['format']): string {
-  const n = parseFloat(state)
-  if (isNaN(n) || state === 'unknown' || state === 'unavailable') return '—'
-  switch (format) {
-    case 'temp':     return `${n.toFixed(1)}°`
-    case 'humidity': return `${n.toFixed(0)}%`
-    case 'rate_gbp': return `${(n * 100).toFixed(1)}p`
-    case 'cost_gbp': return `£${n.toFixed(2)}`
-    default:         return String(n)
-  }
-}
 
 interface Props {
   states: HAState[]
@@ -106,32 +65,26 @@ function EntityTile({ config, haState, onToggle }: {
         active={state === 'on'}
         style={{ ...s.tile, ...s.toggleTile }}
       >
-        <Icon name={icon} style={{ fontSize: 'var(--t-lg)' }} size="1em" />
+        <Icon name={icon} style={{ fontSize: 'var(--t-lg)' }} />
         <span style={sheet.label}>{config.label}</span>
       </Touchable>
     )
   }
 
-  // Every read-only tile shares one shape: icon, value, label. Weather has no
-  // number, so its condition takes the value slot.
-  const value =
-    config.type === 'weather' ? (WEATHER_LABEL[state] ?? state.replace(/-/g, ' '))
-    : config.type === 'climate' ? (attrs.current_temperature !== undefined ? `${attrs.current_temperature}°` : '—')
-    : formatValue(state, config.format)
-
+  // Every read-only tile shares one shape: icon, value, label. Weather reads as
+  // words rather than a number, so it takes two columns and a smaller value.
+  const wide = config.type === 'weather'
   const label =
     config.type === 'climate' && attrs.temperature !== undefined
       ? `${config.label} ${attrs.temperature}°`
       : config.label
 
   return (
-    <div style={{
-      ...s.tile,
-      // Weather reads as words rather than a number, so it gets two columns.
-      ...(config.type === 'weather' ? s.wideTile : {}),
-    }}>
+    <div style={{ ...s.tile, ...(wide ? s.wideTile : {}) }}>
       <span style={s.tileIcon}><Icon name={icon} /></span>
-      <span style={{ ...s.tileValue, ...(config.type === 'weather' ? s.wordValue : {}) }}>{value}</span>
+      <span style={{ ...s.tileValue, ...(wide ? s.wordValue : {}) }}>
+        {valueFor(config, state, attrs)}
+      </span>
       <span style={sheet.label}>{label}</span>
     </div>
   )
@@ -152,8 +105,8 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center', gap: 'var(--s-1)',
     padding: '0 var(--s-2)',
-    border: '1px solid var(--border)',
-    background: 'none',
+    // A tile is a raised fill on the sheet — no outline.
+    background: 'var(--surface-raised)',
     color: 'var(--amber)',
   },
   toggleTile: { opacity: 'var(--o-secondary)' },

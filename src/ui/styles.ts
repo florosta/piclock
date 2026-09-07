@@ -13,7 +13,6 @@ export const s: Record<string, React.CSSProperties> = {
   sheet: {
     width: '100%',
     background: 'var(--surface)',
-    borderTop: '1px solid var(--border)',
     borderRadius: 'var(--r-lg) var(--r-lg) 0 0',
     maxHeight: '90vh',
     display: 'flex', flexDirection: 'column',
@@ -27,12 +26,11 @@ export const s: Record<string, React.CSSProperties> = {
   gripBar: {
     width: '12vw', height: '0.5vw',
     borderRadius: '999px',
-    background: 'var(--border)',
+    background: 'var(--surface-track)',
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: 'var(--s-2) var(--s-4) var(--s-3)',
-    borderBottom: '1px solid var(--border)',
     flexShrink: 0,
   },
   title: {

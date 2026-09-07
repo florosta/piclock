@@ -175,11 +175,18 @@ function Chip({ on, onClick, children }: {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  list: { flex: 1, minHeight: 0, paddingBottom: 'var(--s-3)' },
+  list: {
+    flex: 1, minHeight: 0,
+    padding: '0 var(--s-4) var(--s-4)',
+    display: 'flex', flexDirection: 'column', gap: 'var(--s-1)',
+  },
+  // Rows are separated by the gap between raised fills, not by rules.
   row: {
+    flexShrink: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: 'var(--s-2) var(--s-4)',
-    borderBottom: '1px solid var(--border)',
+    padding: 'var(--s-2) var(--s-3)',
+    borderRadius: 'var(--r-md)',
+    background: 'var(--surface-raised)',
   },
   rowLeft: { display: 'flex', flexDirection: 'column', gap: 'var(--s-1)' },
   rowRight: { display: 'flex', alignItems: 'center', gap: 'var(--s-2)' },
@@ -188,7 +195,7 @@ const s: Record<string, React.CSSProperties> = {
     letterSpacing: '0.02em', fontVariantNumeric: 'tabular-nums',
   },
   bareBtn: {
-    background: 'none', border: 'none',
+    background: 'none',
     fontSize: 'var(--t-lg)',
     width: '9vw', height: '9vw',
   },
@@ -207,7 +214,6 @@ const s: Record<string, React.CSSProperties> = {
   stepBtn: {
     width: '8vw', height: '8vw',
     fontSize: 'var(--t-lg)',
-    background: 'none',
   },
   stepValue: {
     fontSize: 'var(--t-xl)', fontWeight: 200, lineHeight: 1,
@@ -224,12 +230,11 @@ const s: Record<string, React.CSSProperties> = {
   chip: {
     minWidth: '7vw', height: '7vw',
     fontSize: 'var(--t-sm)',
-    background: 'none',
     letterSpacing: 'var(--track-label)',
     opacity: 'var(--o-secondary)',
   },
   labelInput: {
-    background: 'none', border: '1px solid var(--border)',
+    background: 'var(--surface-raised)', border: 'none',
     borderRadius: 'var(--r-md)',
     fontSize: 'var(--t-md)',
     padding: 'var(--s-1) var(--s-3)',
@@ -242,16 +247,14 @@ const s: Record<string, React.CSSProperties> = {
   textBtn: {
     fontSize: 'var(--t-md)',
     padding: 'var(--s-1) var(--s-5)',
-    background: 'none',
     letterSpacing: 'var(--track-label)',
   },
   addBtn: {
-    width: '100%',
-    justifyContent: 'flex-start',
+    width: '100%', flexShrink: 0,
     gap: 'var(--s-2)',
     fontSize: 'var(--t-md)',
     padding: 'var(--s-3) var(--s-4)',
-    background: 'none', border: 'none', borderRadius: 0,
+    marginTop: 'var(--s-1)',
     opacity: 'var(--o-secondary)',
     letterSpacing: 'var(--track-label)',
   },

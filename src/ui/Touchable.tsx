@@ -81,6 +81,14 @@ function useTouchable({ onActivate, disabled, repeat }: Options) {
   const onPointerUp = useCallback(() => end(), [end])
   const onPointerCancel = useCallback(() => { cancelled.current = true; end() }, [end])
 
+  // Touch pointers are implicitly captured, so pointerup always comes back to
+  // this element and clears the press. A mouse is not captured: drag off a
+  // button and neither move nor up arrives, leaving it stuck lit. Only the
+  // boundary event catches that case.
+  const onPointerLeave = useCallback(() => {
+    if (origin.current) { cancelled.current = true; end() }
+  }, [end])
+
   // Activation still runs off click, so keyboard and assistive tech work when
   // the app is opened from a desktop browser on the LAN. The pointer handlers
   // above only decide whether that click is allowed to count.
@@ -92,7 +100,7 @@ function useTouchable({ onActivate, disabled, repeat }: Options) {
 
   return {
     pressed,
-    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onClick },
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPointerLeave, onClick },
   }
 }
 
@@ -133,8 +141,9 @@ export default function Touchable({
 }
 
 const base: React.CSSProperties = {
-  border: '1px solid var(--border)',
-  background: 'var(--surface)',
+  // No stroke anywhere: a control is a raised fill, and pressing it lights up.
+  border: 'none',
+  background: 'var(--surface-raised)',
   color: 'var(--amber)',
   borderRadius: 'var(--r-md)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -145,7 +154,6 @@ const base: React.CSSProperties = {
 
 const on: React.CSSProperties = {
   background: 'var(--amber-faint)',
-  borderColor: 'var(--amber-dim)',
   opacity: 1,
 }
 

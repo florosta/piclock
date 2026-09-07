@@ -4,6 +4,7 @@ import { useEpisodes } from './hooks/useEpisodes'
 import { useBacklight } from './hooks/useBacklight'
 import { useAlarms } from './hooks/useAlarms'
 import { useHA } from './hooks/useHA'
+import { CLOCK_ENTITIES } from './config/ha'
 import ClockView from './views/ClockView'
 import EpisodePicker from './views/EpisodePicker'
 import AlarmManager from './views/AlarmManager'
@@ -34,6 +35,10 @@ export default function App() {
       <ClockView
         player={player}
         nextAlarm={alarms.nextAlarm}
+        clockEntities={CLOCK_ENTITIES.map(config => ({
+          config,
+          state: ha.states.find(s => s.entity_id === config.id) ?? null,
+        }))}
         onShowPicker={() => setShowPicker(true)}
         onShowAlarms={() => setShowAlarms(true)}
         onShowHA={() => { ha.refresh(); setShowHA(true) }}
