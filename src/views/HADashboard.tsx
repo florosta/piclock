@@ -1,12 +1,38 @@
 import { groupBySectionOrdered, HA_ENTITIES } from '../config/ha'
 import type { EntityConfig } from '../config/ha'
 import type { HAState } from '../hooks/useHA'
+import Icon from '../ui/Icon'
+import type { IconName } from '../ui/Icon'
+import Sheet, { IconButton } from '../ui/Sheet'
+import { s as sheet } from '../ui/styles'
+import Touchable from '../ui/Touchable'
 
-const WEATHER_ICON: Record<string, string> = {
-  'sunny': '☀', 'clear-night': '☾', 'partlycloudy': '⛅', 'cloudy': '☁',
-  'rainy': '☂', 'pouring': '☂', 'snowy': '❄', 'snowy-rainy': '❄',
-  'fog': '≈', 'windy': '〜', 'lightning': '⚡', 'lightning-rainy': '⚡',
-  'hail': '●',
+const WEATHER_ICON: Record<string, IconName> = {
+  'sunny': 'sun', 'clear-night': 'moon', 'partlycloudy': 'cloudSun', 'cloudy': 'cloud',
+  'rainy': 'rain', 'pouring': 'rain', 'snowy': 'snow', 'snowy-rainy': 'snow',
+  'fog': 'fog', 'windy': 'wind', 'lightning': 'bolt', 'lightning-rainy': 'bolt',
+  'hail': 'snow',
+}
+
+const WEATHER_LABEL: Record<string, string> = {
+  'partlycloudy': 'Partly cloudy', 'clear-night': 'Clear', 'snowy-rainy': 'Sleet',
+  'lightning-rainy': 'Thunder', 'pouring': 'Heavy rain', 'exceptional': 'Extreme',
+}
+
+const SENSOR_ICON: Record<string, IconName> = {
+  temp: 'thermometer', humidity: 'droplet', rate_gbp: 'bolt', cost_gbp: 'coin',
+}
+
+/** Icons come from the entity's own type and format, so config/ha.ts stays
+ *  a single line per entity. Set `icon` there to override. */
+function iconFor(config: EntityConfig, state: string): IconName {
+  if (config.icon) return config.icon
+  switch (config.type) {
+    case 'toggle':  return 'bulb'
+    case 'climate': return 'flame'
+    case 'weather': return WEATHER_ICON[state] ?? 'unknown'
+    case 'sensor':  return SENSOR_ICON[config.format ?? ''] ?? 'unknown'
+  }
 }
 
 function formatValue(state: string, format?: EntityConfig['format']): string {
@@ -34,41 +60,33 @@ export default function HADashboard({ states, loading, onToggle, onClose, onRefr
   const sections = groupBySectionOrdered(HA_ENTITIES)
 
   return (
-    <div style={s.overlay} onClick={onClose}>
-      <div style={s.sheet} onClick={e => e.stopPropagation()}>
-
-        <div style={s.header}>
-          <span style={s.title}>House</span>
-          <div style={s.headerActions}>
-            <button style={s.iconBtn} onClick={onRefresh}>↺</button>
-            <button style={s.iconBtn} onClick={onClose}>✕</button>
-          </div>
-        </div>
-
-        {loading ? (
-          <div style={s.status}>Loading…</div>
-        ) : (
-          <div style={s.body}>
-            {sections.map(([section, entities]) => (
-              <div key={section} style={s.section}>
-                <div style={s.sectionLabel}>{section}</div>
-                <div style={s.row}>
-                  {entities.map(entity => (
-                    <EntityTile
-                      key={entity.id}
-                      config={entity}
-                      haState={byId[entity.id] ?? null}
-                      onToggle={onToggle}
-                    />
-                  ))}
-                </div>
+    <Sheet
+      title="House"
+      onClose={onClose}
+      actions={<IconButton name="refresh" label="Refresh" onClick={onRefresh} />}
+    >
+      {loading ? (
+        <div style={sheet.status}>Loading…</div>
+      ) : (
+        <div className="scroll" style={{ ...sheet.body, minHeight: 0 }}>
+          {sections.map(([section, entities]) => (
+            <div key={section} style={s.section}>
+              <div style={sheet.sectionLabel}>{section}</div>
+              <div style={s.row}>
+                {entities.map(entity => (
+                  <EntityTile
+                    key={entity.id}
+                    config={entity}
+                    haState={byId[entity.id] ?? null}
+                    onToggle={onToggle}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-
-      </div>
-    </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Sheet>
   )
 }
 
@@ -79,98 +97,72 @@ function EntityTile({ config, haState, onToggle }: {
 }) {
   const state = haState?.state ?? 'unavailable'
   const attrs = haState?.attributes ?? {}
+  const icon = iconFor(config, state)
 
-  switch (config.type) {
-    case 'toggle': {
-      const on = state === 'on'
-      return (
-        <button
-          style={{ ...s.tile, ...s.toggleTile, ...(on ? s.tileOn : {}) }}
-          onClick={() => onToggle(config.id, state)}
-        >
-          <span style={s.tileIcon}>💡</span>
-          <span style={s.tileLabel}>{config.label}</span>
-        </button>
-      )
-    }
-
-    case 'sensor':
-      return (
-        <div style={{ ...s.tile, ...s.dataTile }}>
-          <span style={s.tileValue}>{formatValue(state, config.format)}</span>
-          <span style={s.tileLabel}>{config.label}</span>
-        </div>
-      )
-
-    case 'weather': {
-      const icon = WEATHER_ICON[state] ?? '?'
-      return (
-        <div style={{ ...s.tile, ...s.dataTile, flex: 2 }}>
-          <span style={s.tileIcon}>{icon}</span>
-          <span style={s.tileLabel}>{state}</span>
-        </div>
-      )
-    }
-
-    case 'climate': {
-      const current = attrs.current_temperature as number | undefined
-      const target = attrs.temperature as number | undefined
-      const action = attrs.hvac_action as string | undefined
-      return (
-        <div style={{ ...s.tile, ...s.dataTile }}>
-          <span style={s.tileValue}>{current !== undefined ? `${current}°` : '—'}</span>
-          <span style={s.tileLabel}>{target !== undefined ? `→ ${target}°` : action ?? config.label}</span>
-        </div>
-      )
-    }
+  if (config.type === 'toggle') {
+    return (
+      <Touchable
+        onClick={() => onToggle(config.id, state)}
+        active={state === 'on'}
+        style={{ ...s.tile, ...s.toggleTile }}
+      >
+        <Icon name={icon} style={{ fontSize: 'var(--t-lg)' }} size="1em" />
+        <span style={sheet.label}>{config.label}</span>
+      </Touchable>
+    )
   }
+
+  // Every read-only tile shares one shape: icon, value, label. Weather has no
+  // number, so its condition takes the value slot.
+  const value =
+    config.type === 'weather' ? (WEATHER_LABEL[state] ?? state.replace(/-/g, ' '))
+    : config.type === 'climate' ? (attrs.current_temperature !== undefined ? `${attrs.current_temperature}°` : '—')
+    : formatValue(state, config.format)
+
+  const label =
+    config.type === 'climate' && attrs.temperature !== undefined
+      ? `${config.label} ${attrs.temperature}°`
+      : config.label
+
+  return (
+    <div style={{
+      ...s.tile,
+      // Weather reads as words rather than a number, so it gets two columns.
+      ...(config.type === 'weather' ? s.wideTile : {}),
+    }}>
+      <span style={s.tileIcon}><Icon name={icon} /></span>
+      <span style={{ ...s.tileValue, ...(config.type === 'weather' ? s.wordValue : {}) }}>{value}</span>
+      <span style={sheet.label}>{label}</span>
+    </div>
+  )
 }
 
-const TILE = '18vw'
+const TILE = '15vw'
 
 const s: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
-    display: 'flex', alignItems: 'flex-end', zIndex: 10,
+  section: { display: 'flex', flexDirection: 'column', gap: 'var(--s-2)' },
+  row: {
+    display: 'grid',
+    gridTemplateColumns: `repeat(auto-fill, ${TILE})`,
+    gap: 'var(--s-2)',
   },
-  sheet: {
-    width: '100%', background: 'var(--surface)',
-    borderTop: '1px solid var(--border)', maxHeight: '80vh',
-    display: 'flex', flexDirection: 'column',
-  },
-  header: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '3vw 4vw', borderBottom: '1px solid var(--border)', flexShrink: 0,
-  },
-  title: { fontSize: '3vw', letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.6 },
-  headerActions: { display: 'flex', gap: '2vw', alignItems: 'center' },
-  iconBtn: {
-    background: 'none', border: 'none', color: 'var(--amber)',
-    fontSize: '3vw', cursor: 'pointer', opacity: 0.5,
-  },
-  status: { textAlign: 'center', opacity: 0.4, padding: '8vw', fontSize: '3vw' },
-  body: { overflowY: 'auto', flex: 1, padding: '3vw 4vw', display: 'flex', flexDirection: 'column', gap: '4vw' },
-  section: { display: 'flex', flexDirection: 'column', gap: '2vw' },
-  sectionLabel: { fontSize: '2vw', opacity: 0.35, letterSpacing: '0.2em', textTransform: 'uppercase' },
-  row: { display: 'flex', gap: '2vw', flexWrap: 'wrap' },
   tile: {
-    height: TILE, minWidth: TILE,
-    borderRadius: '1.5vw',
+    height: TILE, width: '100%', minWidth: 0,
+    borderRadius: 'var(--r-md)',
     display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center', gap: '0.8vw',
-    padding: '0 2vw',
+    alignItems: 'center', justifyContent: 'center', gap: 'var(--s-1)',
+    padding: '0 var(--s-2)',
+    border: '1px solid var(--border)',
+    background: 'none',
+    color: 'var(--amber)',
   },
-  toggleTile: {
-    border: '1px solid var(--border)', background: 'none',
-    color: 'var(--amber)', cursor: 'pointer', opacity: 0.5,
+  toggleTile: { opacity: 'var(--o-secondary)' },
+  wideTile: { gridColumn: 'span 2' },
+  wordValue: { fontSize: 'var(--t-md)' },
+  tileIcon: { fontSize: 'var(--t-md)', opacity: 'var(--o-tertiary)', display: 'flex' },
+  tileValue: {
+    fontSize: 'var(--t-lg)', fontWeight: 200, lineHeight: 1,
+    fontVariantNumeric: 'tabular-nums',
+    textTransform: 'capitalize',
   },
-  tileOn: {
-    background: 'var(--amber-faint)', border: '1px solid var(--amber-dim)', opacity: 1,
-  },
-  dataTile: {
-    border: '1px solid var(--border)', background: 'none', color: 'var(--amber)',
-  },
-  tileIcon: { fontSize: '5vw', lineHeight: 1 },
-  tileValue: { fontSize: '4vw', fontWeight: 200, lineHeight: 1 },
-  tileLabel: { fontSize: '1.8vw', opacity: 0.45, letterSpacing: '0.05em' },
 }

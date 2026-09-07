@@ -1,3 +1,5 @@
+import type { IconName } from '../ui/Icon'
+
 export type EntityType = 'toggle' | 'sensor' | 'climate' | 'weather'
 export type SensorFormat = 'temp' | 'humidity' | 'rate_gbp' | 'cost_gbp' | 'plain'
 
@@ -8,6 +10,8 @@ export interface EntityConfig {
   type: EntityType
   unit?: string
   format?: SensorFormat
+  /** Optional override; otherwise the icon is derived from type + format. */
+  icon?: IconName
 }
 
 export const HA_ENTITIES: EntityConfig[] = [

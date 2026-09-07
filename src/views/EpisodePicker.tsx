@@ -1,5 +1,9 @@
 import type { EpisodesState } from '../hooks/useEpisodes'
 import type { Episode } from '../types'
+import Icon from '../ui/Icon'
+import Sheet from '../ui/Sheet'
+import { s as sheet } from '../ui/styles'
+import Touchable from '../ui/Touchable'
 
 function formatDuration(s: number) {
   const h = Math.floor(s / 3600)
@@ -22,28 +26,26 @@ export default function EpisodePicker({ episodes, currentEpisode, onSelect, onCl
   const { episodes: list, loading, error } = episodes
 
   return (
-    <div style={s.overlay} onClick={onClose}>
-      <div style={s.sheet} onClick={e => e.stopPropagation()}>
+    <Sheet title="Episodes" onClose={onClose}>
+      <div className="scroll" style={s.list}>
+        {loading && <div style={sheet.status}>Loading…</div>}
+        {error && <div style={sheet.status}>{error}</div>}
 
-        <div style={s.header}>
-          <span style={s.title}>Episodes</span>
-          <button style={s.closeBtn} onClick={onClose}>✕</button>
-        </div>
-
-        <div style={s.list}>
-          {loading && <div style={s.status}>Loading…</div>}
-          {error && <div style={s.status}>{error}</div>}
-          {list.map((ep: Episode) => (
-            <div
+        {list.map((ep: Episode) => {
+          const current = currentEpisode?.id === ep.id
+          return (
+            <Touchable
               key={ep.id}
-              style={{ ...s.row, ...(currentEpisode?.id === ep.id ? s.rowActive : {}) }}
               onClick={() => onSelect(ep)}
+              active={current}
+              style={s.row}
+              activeStyle={s.rowActive}
             >
               <img
                 style={s.cover}
                 src={ep.podcast.coverUrl}
                 alt=""
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }}
               />
               <div style={s.info}>
                 <div style={s.epTitle}>{ep.title}</div>
@@ -51,64 +53,47 @@ export default function EpisodePicker({ episodes, currentEpisode, onSelect, onCl
                   {formatDate(ep.publishedAt)} · {formatDuration(ep.duration)}
                 </div>
               </div>
-              {currentEpisode?.id === ep.id && <span style={s.check}>✓</span>}
-            </div>
-          ))}
-        </div>
-
+              <span style={{ ...s.check, opacity: current ? 'var(--o-primary)' : 0 }}>
+                <Icon name="check" />
+              </span>
+            </Touchable>
+          )
+        })}
       </div>
-    </div>
+    </Sheet>
   )
 }
 
 const s: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed', inset: 0,
-    background: 'rgba(0,0,0,0.7)',
-    display: 'flex', alignItems: 'flex-end',
-    zIndex: 10,
-  },
-  sheet: {
-    width: '100%',
-    background: 'var(--surface)',
-    borderTop: '1px solid var(--border)',
-    maxHeight: '80vh',
-    display: 'flex', flexDirection: 'column',
-  },
-  header: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '3vw 4vw',
-    borderBottom: '1px solid var(--border)',
-    flexShrink: 0,
-  },
-  title: {
-    fontSize: '3vw', letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.6,
-  },
-  closeBtn: {
-    background: 'none', border: 'none', color: 'var(--amber)',
-    fontSize: '3vw', cursor: 'pointer', opacity: 0.5,
-  },
-  list: { overflowY: 'auto', flex: 1 },
-  status: {
-    textAlign: 'center', opacity: 0.4, padding: '6vw', fontSize: '3vw',
-  },
+  list: { flex: 1, minHeight: 0 },
   row: {
-    display: 'flex', alignItems: 'center', gap: '3vw',
-    padding: '2.5vw 4vw',
+    width: '100%',
+    display: 'flex', alignItems: 'center', gap: 'var(--s-3)',
+    padding: 'var(--s-2) var(--s-4)',
+    border: 'none',
     borderBottom: '1px solid var(--border)',
-    cursor: 'pointer',
+    borderRadius: 0,
+    background: 'none',
+    textAlign: 'left',
+    opacity: 1,
   },
-  rowActive: { background: 'var(--amber-faint)' },
+  rowActive: { background: 'var(--amber-faint)', borderColor: 'var(--border)' },
   cover: {
-    width: '9vw', height: '9vw', borderRadius: '1vw',
+    width: '10vw', height: '10vw', borderRadius: 'var(--r-sm)',
     objectFit: 'cover', flexShrink: 0,
+    background: 'var(--surface-raised)',
   },
-  info: { flex: 1, overflow: 'hidden' },
+  info: { flex: 1, overflow: 'hidden', minWidth: 0 },
   epTitle: {
-    fontSize: '2.8vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    fontSize: 'var(--t-md)',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    textAlign: 'left',
   },
   epMeta: {
-    fontSize: '2vw', opacity: 0.4, marginTop: '0.8vw',
+    fontSize: 'var(--t-xs)',
+    opacity: 'var(--o-tertiary)',
+    marginTop: 'var(--s-1)',
+    textAlign: 'left',
   },
-  check: { fontSize: '3vw', opacity: 0.7, flexShrink: 0 },
+  check: { fontSize: 'var(--t-lg)', flexShrink: 0, display: 'flex' },
 }

@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import type { Alarm } from '../types'
+import Icon from '../ui/Icon'
+import Sheet from '../ui/Sheet'
+import { s as sheet } from '../ui/styles'
+import Touchable from '../ui/Touchable'
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+
+function pad(n: number) { return String(n).padStart(2, '0') }
 
 interface Props {
   alarms: Alarm[]
@@ -13,16 +19,21 @@ interface Props {
 
 export default function AlarmManager({ alarms, onAdd, onToggle, onDelete, onClose }: Props) {
   const [adding, setAdding] = useState(false)
-  const [newTime, setNewTime] = useState('07:30')
+  const [hour, setHour] = useState(7)
+  const [minute, setMinute] = useState(30)
   const [newDays, setNewDays] = useState<number[]>([1, 2, 3, 4, 5])
   const [newLabel, setNewLabel] = useState('')
 
-  function submitAdd() {
-    onAdd({ time: newTime, days: newDays, label: newLabel, enabled: true })
+  function reset() {
     setAdding(false)
-    setNewTime('07:30')
+    setHour(7); setMinute(30)
     setNewDays([1, 2, 3, 4, 5])
     setNewLabel('')
+  }
+
+  function submitAdd() {
+    onAdd({ time: `${pad(hour)}:${pad(minute)}`, days: newDays, label: newLabel, enabled: true })
+    reset()
   }
 
   function toggleDay(d: number) {
@@ -30,160 +41,218 @@ export default function AlarmManager({ alarms, onAdd, onToggle, onDelete, onClos
   }
 
   return (
-    <div style={s.overlay} onClick={onClose}>
-      <div style={s.sheet} onClick={e => e.stopPropagation()}>
+    // On a 720px-tall screen the add form would sit below the list and need
+    // scrolling to reach, so it takes the sheet over instead of appending to it.
+    <Sheet title={adding ? 'New alarm' : 'Alarms'} onClose={onClose}>
+      <div className="scroll" style={s.list}>
 
-        <div style={s.header}>
-          <span style={s.title}>Alarms</span>
-          <button style={s.closeBtn} onClick={onClose}>✕</button>
-        </div>
+        {adding ? (
+          <div style={s.addForm}>
+            <TimeStepper hour={hour} minute={minute} onHour={setHour} onMinute={setMinute} />
 
-        <div style={s.list}>
-          {alarms.map(alarm => (
-            <div key={alarm.id} style={s.row}>
-              <div style={s.rowLeft}>
-                <div style={{ ...s.alarmTime, opacity: alarm.enabled ? 1 : 0.35 }}>
-                  {alarm.time}
-                </div>
-                <div style={s.alarmMeta}>
-                  {alarm.label || (alarm.days.length === 0 ? 'Once' : alarm.days.map(d => DAY_LABELS[d]).join(' '))}
-                </div>
-              </div>
-              <div style={s.rowRight}>
-                <button
-                  style={{ ...s.toggleBtn, ...(alarm.enabled ? s.toggleOn : {}) }}
-                  onClick={() => onToggle(alarm.id)}
-                >
-                  {alarm.enabled ? '●' : '○'}
-                </button>
-                <button style={s.deleteBtn} onClick={() => onDelete(alarm.id)}>✕</button>
-              </div>
+            <div style={s.daysRow}>
+              {DAY_LABELS.map((label, d) => (
+                <Chip key={d} on={newDays.includes(d)} onClick={() => toggleDay(d)}>{label}</Chip>
+              ))}
+              <Chip on={newDays.length === 0} onClick={() => setNewDays([])}>1×</Chip>
             </div>
-          ))}
 
-          {adding ? (
-            <div style={s.addForm}>
-              <input
-                type="time"
-                value={newTime}
-                onChange={e => setNewTime(e.target.value)}
-                style={s.timeInput}
-              />
-              <input
-                type="text"
-                placeholder="Label (optional)"
-                value={newLabel}
-                onChange={e => setNewLabel(e.target.value)}
-                style={s.labelInput}
-              />
-              <div style={s.daysRow}>
-                {DAY_LABELS.map((label, d) => (
-                  <button
-                    key={d}
-                    style={{ ...s.dayBtn, ...(newDays.includes(d) ? s.dayBtnOn : {}) }}
-                    onClick={() => toggleDay(d)}
+            <input
+              type="text"
+              placeholder="Label (optional)"
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              style={s.labelInput}
+            />
+
+            <div style={s.addActions}>
+              <Touchable onClick={reset} style={s.textBtn}>Cancel</Touchable>
+              <Touchable onClick={submitAdd} active style={s.textBtn}>Save</Touchable>
+            </div>
+          </div>
+        ) : (
+          <>
+            {alarms.map(alarm => (
+              <div key={alarm.id} style={s.row}>
+                <div style={s.rowLeft}>
+                  <div style={{ ...s.alarmTime, opacity: alarm.enabled ? 1 : 'var(--o-tertiary)' }}>
+                    {alarm.time}
+                  </div>
+                  <div style={sheet.label}>
+                    {alarm.label || (alarm.days.length === 0 ? 'Once' : alarm.days.map(d => DAY_LABELS[d]).join(' '))}
+                  </div>
+                </div>
+                <div style={s.rowRight}>
+                  <Touchable
+                    aria-label={alarm.enabled ? 'Disable alarm' : 'Enable alarm'}
+                    onClick={() => onToggle(alarm.id)}
+                    style={{ ...s.bareBtn, opacity: alarm.enabled ? 1 : 'var(--o-tertiary)' }}
                   >
-                    {label}
-                  </button>
-                ))}
-                <button
-                  style={{ ...s.dayBtn, ...(newDays.length === 0 ? s.dayBtnOn : {}) }}
-                  onClick={() => setNewDays([])}
-                >
-                  1×
-                </button>
+                    <Icon name={alarm.enabled ? 'toggleOn' : 'toggleOff'} />
+                  </Touchable>
+                  <Touchable
+                    aria-label="Delete alarm"
+                    onClick={() => onDelete(alarm.id)}
+                    style={{ ...s.bareBtn, fontSize: 'var(--t-md)', opacity: 'var(--o-tertiary)' }}
+                  >
+                    <Icon name="trash" />
+                  </Touchable>
+                </div>
               </div>
-              <div style={s.addActions}>
-                <button style={s.cancelBtn} onClick={() => setAdding(false)}>Cancel</button>
-                <button style={s.saveBtn} onClick={submitAdd}>Save</button>
-              </div>
-            </div>
-          ) : (
-            <button style={s.addBtn} onClick={() => setAdding(true)}>+ Add alarm</button>
-          )}
-        </div>
+            ))}
+
+            <Touchable onClick={() => setAdding(true)} style={s.addBtn}>
+              <Icon name="plus" />
+              <span>Add alarm</span>
+            </Touchable>
+          </>
+        )}
 
       </div>
+    </Sheet>
+  )
+}
+
+/**
+ * Hours and minutes as two −/+ steppers instead of <input type="time">.
+ * The native control expects a keyboard or a mouse-precision spinner; on the
+ * Pi it opened a picker sized for a cursor. These are thumb-sized targets that
+ * repeat when held, and laid out on one line the whole form fits the sheet
+ * without scrolling. Minutes move in fives — nobody sets an alarm for 06:47.
+ */
+function TimeStepper({ hour, minute, onHour, onMinute }: {
+  hour: number
+  minute: number
+  onHour: (h: number) => void
+  onMinute: (m: number) => void
+}) {
+  return (
+    <div style={s.stepper}>
+      <Unit
+        label="Hours"
+        value={pad(hour)}
+        onDown={() => onHour((hour + 23) % 24)}
+        onUp={() => onHour((hour + 1) % 24)}
+      />
+      <div style={s.colon}>:</div>
+      <Unit
+        label="Minutes"
+        value={pad(minute)}
+        onDown={() => onMinute((minute + 55) % 60)}
+        onUp={() => onMinute((minute + 5) % 60)}
+      />
     </div>
   )
 }
 
+function Unit({ label, value, onUp, onDown }: {
+  label: string
+  value: string
+  onUp: () => void
+  onDown: () => void
+}) {
+  return (
+    <div style={s.unit}>
+      <Touchable aria-label={`${label} down`} onClick={onDown} repeat style={s.stepBtn}>
+        <Icon name="minus" />
+      </Touchable>
+      <div style={s.stepValue}>{value}</div>
+      <Touchable aria-label={`${label} up`} onClick={onUp} repeat style={s.stepBtn}>
+        <Icon name="plus" />
+      </Touchable>
+    </div>
+  )
+}
+
+function Chip({ on, onClick, children }: {
+  on: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <Touchable onClick={onClick} active={on} style={s.chip}>{children}</Touchable>
+  )
+}
+
 const s: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
-    display: 'flex', alignItems: 'flex-end', zIndex: 10,
-  },
-  sheet: {
-    width: '100%', background: 'var(--surface)',
-    borderTop: '1px solid var(--border)', maxHeight: '80vh',
-    display: 'flex', flexDirection: 'column',
-  },
-  header: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '3vw 4vw', borderBottom: '1px solid var(--border)', flexShrink: 0,
-  },
-  title: { fontSize: '3vw', letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.6 },
-  closeBtn: {
-    background: 'none', border: 'none', color: 'var(--amber)',
-    fontSize: '3vw', cursor: 'pointer', opacity: 0.5,
-  },
-  list: { overflowY: 'auto', flex: 1, padding: '1vw 0' },
+  list: { flex: 1, minHeight: 0, paddingBottom: 'var(--s-3)' },
   row: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '2vw 4vw', borderBottom: '1px solid var(--border)',
+    padding: 'var(--s-2) var(--s-4)',
+    borderBottom: '1px solid var(--border)',
   },
-  rowLeft: { display: 'flex', flexDirection: 'column', gap: '0.5vw' },
-  rowRight: { display: 'flex', alignItems: 'center', gap: '2vw' },
-  alarmTime: { fontSize: '4vw', letterSpacing: '0.05em' },
-  alarmMeta: { fontSize: '1.8vw', opacity: 0.4, letterSpacing: '0.05em' },
-  toggleBtn: {
-    background: 'none', border: 'none', color: 'var(--amber)',
-    fontSize: '4vw', cursor: 'pointer', opacity: 0.3,
+  rowLeft: { display: 'flex', flexDirection: 'column', gap: 'var(--s-1)' },
+  rowRight: { display: 'flex', alignItems: 'center', gap: 'var(--s-2)' },
+  alarmTime: {
+    fontSize: 'var(--t-xl)', fontWeight: 200, lineHeight: 1,
+    letterSpacing: '0.02em', fontVariantNumeric: 'tabular-nums',
   },
-  toggleOn: { opacity: 1 },
-  deleteBtn: {
-    background: 'none', border: 'none', color: 'var(--amber)',
-    fontSize: '2.5vw', cursor: 'pointer', opacity: 0.3,
+  bareBtn: {
+    background: 'none', border: 'none',
+    fontSize: 'var(--t-lg)',
+    width: '9vw', height: '9vw',
   },
-  addBtn: {
-    background: 'none', border: 'none', color: 'var(--amber)',
-    fontSize: '2.5vw', cursor: 'pointer', opacity: 0.5,
-    padding: '3vw 4vw', width: '100%', textAlign: 'left',
-    fontFamily: 'var(--font)', letterSpacing: '0.05em',
-  },
+
   addForm: {
-    display: 'flex', flexDirection: 'column', gap: '2vw',
-    padding: '3vw 4vw', borderBottom: '1px solid var(--border)',
+    display: 'flex', flexDirection: 'column', gap: 'var(--s-2)',
+    padding: 'var(--s-2) var(--s-4) var(--s-3)',
+    alignItems: 'center',
   },
-  timeInput: {
-    background: 'none', border: '1px solid var(--border)',
-    color: 'var(--amber)', fontFamily: 'var(--font)',
-    fontSize: '5vw', padding: '1vw 2vw', borderRadius: '1vw',
-    width: '100%',
+  stepper: {
+    display: 'flex', alignItems: 'center', gap: 'var(--s-2)',
+  },
+  unit: {
+    display: 'flex', alignItems: 'center', gap: 'var(--s-2)',
+  },
+  stepBtn: {
+    width: '8vw', height: '8vw',
+    fontSize: 'var(--t-lg)',
+    background: 'none',
+  },
+  stepValue: {
+    fontSize: 'var(--t-xl)', fontWeight: 200, lineHeight: 1,
+    fontVariantNumeric: 'tabular-nums',
+    minWidth: '11vw', textAlign: 'center',
+  },
+  colon: {
+    fontSize: 'var(--t-lg)', fontWeight: 200,
+    opacity: 'var(--o-tertiary)',
+    padding: '0 var(--s-1)',
+  },
+
+  daysRow: { display: 'flex', gap: 'var(--s-1)' },
+  chip: {
+    minWidth: '7vw', height: '7vw',
+    fontSize: 'var(--t-sm)',
+    background: 'none',
+    letterSpacing: 'var(--track-label)',
+    opacity: 'var(--o-secondary)',
   },
   labelInput: {
     background: 'none', border: '1px solid var(--border)',
-    color: 'var(--amber)', fontFamily: 'var(--font)',
-    fontSize: '2.5vw', padding: '1vw 2vw', borderRadius: '1vw',
+    borderRadius: 'var(--r-md)',
+    fontSize: 'var(--t-md)',
+    padding: 'var(--s-1) var(--s-3)',
+    width: '100%', textAlign: 'center',
+  },
+  addActions: {
+    display: 'flex', gap: 'var(--s-3)', justifyContent: 'center',
     width: '100%',
   },
-  daysRow: { display: 'flex', gap: '1.5vw' },
-  dayBtn: {
-    background: 'none', border: '1px solid var(--border)',
-    color: 'var(--amber)', fontFamily: 'var(--font)',
-    fontSize: '2vw', padding: '1vw 1.5vw', borderRadius: '0.8vw',
-    cursor: 'pointer', opacity: 0.4,
+  textBtn: {
+    fontSize: 'var(--t-md)',
+    padding: 'var(--s-1) var(--s-5)',
+    background: 'none',
+    letterSpacing: 'var(--track-label)',
   },
-  dayBtnOn: { background: 'var(--amber-faint)', border: '1px solid var(--amber-dim)', opacity: 1 },
-  addActions: { display: 'flex', gap: '2vw', justifyContent: 'flex-end' },
-  cancelBtn: {
-    background: 'none', border: '1px solid var(--border)', color: 'var(--amber)',
-    fontFamily: 'var(--font)', fontSize: '2.5vw', padding: '1vw 3vw',
-    borderRadius: '1vw', cursor: 'pointer', opacity: 0.5,
-  },
-  saveBtn: {
-    background: 'var(--amber-faint)', border: '1px solid var(--amber-dim)', color: 'var(--amber)',
-    fontFamily: 'var(--font)', fontSize: '2.5vw', padding: '1vw 3vw',
-    borderRadius: '1vw', cursor: 'pointer',
+  addBtn: {
+    width: '100%',
+    justifyContent: 'flex-start',
+    gap: 'var(--s-2)',
+    fontSize: 'var(--t-md)',
+    padding: 'var(--s-3) var(--s-4)',
+    background: 'none', border: 'none', borderRadius: 0,
+    opacity: 'var(--o-secondary)',
+    letterSpacing: 'var(--track-label)',
   },
 }

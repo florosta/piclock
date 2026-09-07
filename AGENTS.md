@@ -16,6 +16,14 @@ src/
     useAlarms.ts       — alarm CRUD, SSE listener, firingAlarm state, nextAlarm calc
     useBacklight.ts    — auto-dim backlight after 2min inactivity via /api/brightness
     useHA.ts           — HA state fetching (reads entity IDs from config/ha.ts), toggle, refresh
+  ui/
+    Icon.tsx           — the only icon set: inline SVG, 24×24 grid, currentColor
+                         solid marks for transport, line marks for everything else
+                         no emoji anywhere — Chromium renders them in colour
+    Touchable.tsx      — every pressable thing: press feedback on pointerdown,
+                         drag past 12px cancels the tap, optional hold-to-repeat
+    Sheet.tsx          — the one bottom sheet + IconButton
+    styles.ts          — style fragments shared across sheets (header, label, status)
   views/
     ClockView.tsx      — primary UI: clock + podcast controls + alarm/house buttons
     EpisodePicker.tsx  — bottom-sheet episode list
@@ -39,7 +47,29 @@ restart.sh             — Pi-side server restart (used by deploy.sh and labwc a
 - `Alarm` type canonical in `src/types.ts`; server has a local mirror with a keep-in-sync comment
 - All sizing in `vw` — targets 1280×720 landscape touchscreen
 - Inline `React.CSSProperties` styles — no CSS modules or Tailwind, no external UI libraries
+- **Every value comes from a token** in `src/index.css`: type (`--t-display`…`--t-xs`),
+  spacing (`--s-1`…`--s-5`), radii (`--r-*`), opacity (`--o-full`…`--o-disabled`).
+  No raw `vw` font sizes or one-off opacities in a view — add a token instead
 - Dark amber palette: `--amber: #e8c97a`, `--bg: #0a0a0a`
+- Anything pressable goes through `ui/Touchable` — never a bare `<button onClick>`,
+  or it will behave like a cursor target rather than a touch target
+- Anything symbolic goes through `ui/Icon` — never a glyph or an emoji in a string
+
+## Touch
+
+The screen is a finger, and Chromium defaults to mouse semantics. What that costs,
+and where each fix lives:
+
+| Mouse behaviour | Fix |
+|---|---|
+| 300ms tap delay | `touch-action: manipulation` (index.css) |
+| Cursor arrow parked over a button | `cursor: none` under `@media (pointer: coarse)` |
+| Nothing happens until release | press state on `pointerdown` (`ui/Touchable`) |
+| Scrolling a list fires the row you started on | 12px drag slop cancels the tap |
+| Flicking a list past its edge closes the sheet | backdrop tap needs down+up on the backdrop, under slop |
+| Page rubber-bands behind a sheet | `overscroll-behavior: none` / `contain` on `.scroll` |
+| Volume needs eight separate presses | hold-to-repeat (`repeat` prop on `Touchable`) |
+| `<input type="time">` opens a cursor-sized picker | −/+ steppers in `AlarmManager` |
 
 ## Pi
 

@@ -1,4 +1,6 @@
 import type { Alarm } from '../types'
+import Icon from '../ui/Icon'
+import Touchable from '../ui/Touchable'
 
 interface Props {
   alarm: Alarm
@@ -9,12 +11,21 @@ interface Props {
 export default function AlarmFiring({ alarm, onDismiss, onSnooze }: Props) {
   return (
     <div style={s.root}>
-      <div style={s.icon}>⏰</div>
+      <div style={s.icon}><Icon name="alarm" /></div>
       <div style={s.time}>{alarm.time || 'Alarm'}</div>
       {alarm.label && <div style={s.label}>{alarm.label}</div>}
+
+      {/* Half awake, in the dark: two targets, far apart, impossible to
+          confuse — snooze on the left, dismiss lit on the right. */}
       <div style={s.btns}>
-        <button style={s.snoozeBtn} onClick={onSnooze}>Snooze 9m</button>
-        <button style={s.dismissBtn} onClick={onDismiss}>Dismiss</button>
+        <Touchable onClick={onSnooze} style={s.btn}>
+          <Icon name="moon" />
+          <span>Snooze 9m</span>
+        </Touchable>
+        <Touchable onClick={onDismiss} active style={s.btn}>
+          <Icon name="close" />
+          <span>Dismiss</span>
+        </Touchable>
       </div>
     </div>
   )
@@ -26,24 +37,27 @@ const s: Record<string, React.CSSProperties> = {
     background: 'var(--bg)',
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
-    gap: '4vw',
+    gap: 'var(--s-3)',
   },
-  icon: { fontSize: '10vw' },
+  icon: { fontSize: 'var(--t-lg)', opacity: 'var(--o-secondary)' },
   time: {
-    fontSize: '18vw', fontWeight: 200, letterSpacing: '-0.02em', lineHeight: 1,
+    fontSize: 'var(--t-jumbo)', fontWeight: 200,
+    letterSpacing: '-0.03em', lineHeight: 1,
     color: 'var(--amber)',
     textShadow: '0 0 80px rgba(232,201,122,0.4)',
   },
-  label: { fontSize: '4vw', opacity: 0.5, letterSpacing: '0.1em' },
-  btns: { display: 'flex', gap: '4vw', marginTop: '2vw' },
-  snoozeBtn: {
-    background: 'none', border: '1px solid var(--border)', color: 'var(--amber)',
-    fontFamily: 'var(--font)', fontSize: '3.5vw', padding: '2vw 5vw',
-    borderRadius: '1.5vw', cursor: 'pointer', opacity: 0.7,
+  label: {
+    fontSize: 'var(--t-md)',
+    opacity: 'var(--o-secondary)',
+    letterSpacing: 'var(--track-wide)',
+    textTransform: 'uppercase',
   },
-  dismissBtn: {
-    background: 'var(--amber-faint)', border: '1px solid var(--amber-dim)', color: 'var(--amber)',
-    fontFamily: 'var(--font)', fontSize: '3.5vw', padding: '2vw 5vw',
-    borderRadius: '1.5vw', cursor: 'pointer',
+  btns: { display: 'flex', gap: 'var(--s-5)', marginTop: 'var(--s-4)' },
+  btn: {
+    gap: 'var(--s-2)',
+    fontSize: 'var(--t-md)',
+    padding: 'var(--s-3) var(--s-5)',
+    background: 'none',
+    letterSpacing: 'var(--track-label)',
   },
 }

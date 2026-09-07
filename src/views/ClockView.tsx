@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PlayerState } from '../hooks/usePlayer'
 import type { Alarm } from '../types'
+import Icon from '../ui/Icon'
+import type { IconName } from '../ui/Icon'
+import Touchable from '../ui/Touchable'
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -29,20 +32,31 @@ export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarm
   const { currentEpisode, playing, progress, sleepTimer, play, stop, skip, setSleepTimer, cancelSleepTimer } = player
 
   const [volume, setVolume] = useState(50)
+  const [volumeShown, setVolumeShown] = useState(false)
+  const volumeHide = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     fetch('/api/volume').then(r => r.json()).then(({ value }) => setVolume(value)).catch(() => {})
+    return () => { if (volumeHide.current) clearTimeout(volumeHide.current) }
   }, [])
+
   const adjustVolume = useCallback((delta: number) => {
     setVolume(prev => {
       const next = Math.max(0, Math.min(100, prev + delta))
       fetch('/api/volume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: next }) })
       return next
     })
+    // The buttons are icons, so the level itself has to show somewhere:
+    // it surfaces in the strip for a moment after each press.
+    setVolumeShown(true)
+    if (volumeHide.current) clearTimeout(volumeHide.current)
+    volumeHide.current = setTimeout(() => setVolumeShown(false), 1600)
   }, [])
 
   // Pressing play always arms a 15-min sleep timer — intentional bedtime UX.
-  // At rest the icon is ▶; once the timer is running it shows the countdown.
-  const playIcon = sleepTimer !== null ? `☽ ${fmtTimer(sleepTimer)}` : '▶'
+  // At rest the button is a play mark; once the timer is running it becomes a
+  // moon over the countdown, which is the one place text is allowed in the bar.
+  const timerRunning = sleepTimer !== null
 
   return (
     <div style={s.root}>
@@ -55,9 +69,18 @@ export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarm
       <div style={s.strip}>
         <div style={s.meta}>
           <div style={s.episodeName}>{currentEpisode?.title ?? ''}</div>
-          {nextAlarm && (
-            <div style={s.nextAlarm}>⏰ {nextAlarm.time}</div>
-          )}
+          <div style={s.metaRight}>
+            {volumeShown && (
+              <span style={s.metaItem}>
+                <Icon name="volumeUp" /> {volume}%
+              </span>
+            )}
+            {nextAlarm && (
+              <span style={s.metaItem}>
+                <Icon name="alarm" /> {nextAlarm.time}
+              </span>
+            )}
+          </div>
         </div>
 
         <div style={s.progressBar}>
@@ -65,16 +88,29 @@ export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarm
         </div>
 
         <div style={s.btnRow}>
-          <Sq onClick={() => skip(-20)} disabled={!currentEpisode}>⏪</Sq>
-          <Sq onClick={() => { play(); setSleepTimer(15) }} disabled={!currentEpisode} highlight={playing}>
-            {playIcon}
-          </Sq>
-          <Sq onClick={() => { stop(); cancelSleepTimer() }} disabled={!playing}>⏹</Sq>
-          <Sq onClick={() => adjustVolume(-10)} disabled={volume <= 0}>🔉</Sq>
-          <Sq onClick={() => adjustVolume(10)} disabled={volume >= 100}>🔊</Sq>
-          <Sq onClick={onShowPicker}>☰</Sq>
-          <Sq onClick={onShowAlarms} highlight={!!nextAlarm}>⏰</Sq>
-          <Sq onClick={onShowHA}>⌂</Sq>
+          <Key icon="rewind" label="Back 20 seconds" onClick={() => skip(-20)} disabled={!currentEpisode} repeat />
+
+          <Key
+            icon="play"
+            label={timerRunning ? `Playing, sleep timer ${fmtTimer(sleepTimer)}` : 'Play'}
+            onClick={() => { play(); setSleepTimer(15) }}
+            disabled={!currentEpisode}
+            active={playing}
+          >
+            {timerRunning ? (
+              <span style={s.countdown}>
+                <Icon name="moon" size="0.55em" />
+                <span style={s.countdownText}>{fmtTimer(sleepTimer)}</span>
+              </span>
+            ) : null}
+          </Key>
+
+          <Key icon="stop" label="Stop" onClick={() => { stop(); cancelSleepTimer() }} disabled={!playing} />
+          <Key icon="volumeDown" label="Volume down" onClick={() => adjustVolume(-5)} disabled={volume <= 0} repeat />
+          <Key icon="volumeUp" label="Volume up" onClick={() => adjustVolume(5)} disabled={volume >= 100} repeat />
+          <Key icon="list" label="Episodes" onClick={onShowPicker} />
+          <Key icon="alarm" label="Alarms" onClick={onShowAlarms} active={!!nextAlarm} />
+          <Key icon="home" label="House" onClick={onShowHA} />
         </div>
       </div>
 
@@ -82,24 +118,33 @@ export default function ClockView({ player, nextAlarm, onShowPicker, onShowAlarm
   )
 }
 
-function Sq({ children, onClick, disabled, highlight }: {
-  children: React.ReactNode
+/**
+ * One key in the bottom row. All eight are the same square, sized by flex, so
+ * the row divides the screen evenly whatever the display width — and every
+ * target is comfortably larger than a fingertip.
+ */
+function Key({ icon, label, onClick, disabled, active, repeat, children }: {
+  icon: IconName
+  label: string
   onClick: () => void
   disabled?: boolean
-  highlight?: boolean
+  active?: boolean
+  repeat?: boolean
+  children?: React.ReactNode
 }) {
   return (
-    <button
-      style={{ ...s.btn, ...(highlight ? s.btnOn : {}), ...(disabled ? s.btnOff : {}) }}
+    <Touchable
+      aria-label={label}
       onClick={onClick}
       disabled={disabled}
+      active={active}
+      repeat={repeat}
+      style={s.key}
     >
-      {children}
-    </button>
+      {children ?? <Icon name={icon} />}
+    </Touchable>
   )
 }
-
-const BTN = '9vw'
 
 const s: Record<string, React.CSSProperties> = {
   root: {
@@ -107,61 +152,72 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column',
   },
   clock: {
-    flex: 1,
+    flex: 1, minHeight: 0,
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
   },
   time: {
-    fontSize: '24vw', fontWeight: 200,
-    letterSpacing: '-0.02em', lineHeight: 1,
+    fontSize: 'var(--t-display)', fontWeight: 200,
+    letterSpacing: '-0.03em', lineHeight: 1,
     textShadow: '0 0 60px rgba(232,201,122,0.2)',
   },
   date: {
-    fontSize: '3vw', opacity: 0.3,
-    marginTop: '1.5vw', letterSpacing: '0.3em', textTransform: 'uppercase',
+    fontSize: 'var(--t-sm)',
+    opacity: 'var(--o-tertiary)',
+    marginTop: 'var(--s-2)',
+    letterSpacing: 'var(--track-wide)',
+    textTransform: 'uppercase',
   },
   strip: {
     flexShrink: 0,
-    padding: '2vw 3vw 3vw',
-    display: 'flex', flexDirection: 'column', gap: '1.5vw',
+    padding: 'var(--s-2) var(--s-4) var(--s-4)',
+    display: 'flex', flexDirection: 'column', gap: 'var(--s-2)',
     borderTop: '1px solid var(--border)',
   },
   meta: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    minHeight: 'var(--t-sm)',
   },
   episodeName: {
-    fontSize: '1.6vw', opacity: 0.35, letterSpacing: '0.04em',
+    fontSize: 'var(--t-xs)',
+    opacity: 'var(--o-tertiary)',
+    letterSpacing: 'var(--track-label)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     flex: 1,
   },
-  nextAlarm: {
-    fontSize: '1.6vw', opacity: 0.4, letterSpacing: '0.05em',
-    flexShrink: 0, marginLeft: '2vw',
+  metaRight: {
+    display: 'flex', alignItems: 'center', gap: 'var(--s-3)',
+    flexShrink: 0, marginLeft: 'var(--s-3)',
+  },
+  metaItem: {
+    display: 'flex', alignItems: 'center', gap: '0.6vw',
+    fontSize: 'var(--t-xs)',
+    opacity: 'var(--o-secondary)',
+    letterSpacing: 'var(--track-label)',
   },
   progressBar: {
-    height: '2px', background: 'var(--border)', position: 'relative',
+    height: '0.3vw', background: 'var(--border)',
+    borderRadius: '999px', position: 'relative', overflow: 'hidden',
   },
   progressFill: {
     position: 'absolute', inset: '0 auto 0 0',
-    background: 'var(--amber-dim)', transition: 'width 1s linear',
+    background: 'var(--amber-dim)', borderRadius: '999px',
+    transition: 'width 1s linear',
   },
-  btnRow: { display: 'flex', gap: '1.5vw' },
-  btn: {
-    width: BTN, height: BTN,
-    border: '1px solid var(--border)',
-    background: 'var(--surface)',
-    color: 'var(--amber)',
-    fontFamily: 'system-ui, sans-serif',
-    fontSize: '3.5vw',
-    borderRadius: '1.2vw',
-    cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    opacity: 0.8, flexShrink: 0,
+  btnRow: { display: 'flex', gap: 'var(--s-2)' },
+  key: {
+    flex: 1, aspectRatio: '1',
+    fontSize: 'var(--t-lg)',
+    flexDirection: 'column',
+    gap: '0.4vw',
   },
-  btnOn: {
-    background: 'var(--amber-faint)',
-    border: '1px solid var(--amber-dim)',
-    opacity: 1,
+  countdown: {
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: '0.5vw',
   },
-  btnOff: { opacity: 0.2, cursor: 'default' },
+  countdownText: {
+    fontSize: 'var(--t-sm)',
+    letterSpacing: '0.02em',
+    fontVariantNumeric: 'tabular-nums',
+  },
 }
