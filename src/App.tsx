@@ -61,9 +61,8 @@ export default function App() {
         <EpisodePicker
           episodes={episodes}
           currentEpisode={player.currentEpisode}
-          progress={player.progress}
           elapsed={player.elapsed}
-          onSelect={ep => { player.select(ep); player.play(); setShowPicker(false) }}
+          onSelect={ep => { player.select(ep); player.play(); player.setSleepTimer(15); setShowPicker(false) }}
           onClose={() => setShowPicker(false)}
         />
       )}

@@ -112,8 +112,8 @@ export function usePlayer(): PlayerState {
     if (el) { el.pause(); el.src = '' }
     startTimeRef.current = episode.startTime ?? 0
     setPlaying(false)
-    setProgress(0)
-    setElapsed(0)
+    setProgress(episode.startTime > 0 && episode.duration > 0 ? episode.startTime / episode.duration : 0)
+    setElapsed(episode.startTime ?? 0)
     setDuration(0)
     setSleepTimerEnds(null)
     currentEpisodeRef.current = episode

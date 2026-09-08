@@ -374,8 +374,20 @@ function absHeaders(extra: Record<string, string> = {}) {
 }
 
 app.get('/api/episodes', async (_req, res) => {
-  const libRes = await fetch(`${ABS}/api/libraries`, { headers: absHeaders() })
+  // Fetch user progress and libraries in parallel
+  const [libRes, meRes] = await Promise.all([
+    fetch(`${ABS}/api/libraries`, { headers: absHeaders() }),
+    fetch(`${ABS}/api/me`, { headers: absHeaders() }),
+  ])
   const { libraries } = await libRes.json() as { libraries: { id: string; mediaType: string }[] }
+  const me = await meRes.json() as { mediaProgress?: { episodeId?: string; currentTime: number; isFinished: boolean }[] }
+
+  // episodeId → { currentTime, isFinished }
+  const progressByEpisode = new Map(
+    (me.mediaProgress ?? [])
+      .filter(p => p.episodeId)
+      .map(p => [p.episodeId!, { currentTime: p.currentTime, isFinished: p.isFinished }])
+  )
 
   const episodes: unknown[] = []
   for (const lib of libraries.filter(l => l.mediaType === 'podcast')) {
@@ -388,17 +400,14 @@ app.get('/api/episodes', async (_req, res) => {
         id: string
         media: {
           metadata: { title: string; imageUrl: string }
-          episodes: {
-            id: string; title: string; duration: number; publishedAt: number; audioTrack: { ino: string }
-            userEpisode?: { currentTime: number; isFinished: boolean }
-          }[]
+          episodes: { id: string; title: string; duration: number; publishedAt: number; audioTrack: { ino: string } }[]
         }
       }
       for (const ep of data.media.episodes) {
-        const ue = ep.userEpisode
+        const prog = progressByEpisode.get(ep.id)
         episodes.push({
           ...ep,
-          startTime: ue && !ue.isFinished ? (ue.currentTime ?? 0) : 0,
+          startTime: prog && !prog.isFinished ? (prog.currentTime ?? 0) : 0,
           podcast: { title: data.media.metadata.title, itemId: data.id, coverUrl: data.media.metadata.imageUrl },
         })
       }

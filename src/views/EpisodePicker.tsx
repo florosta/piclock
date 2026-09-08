@@ -19,13 +19,12 @@ function formatDate(ms: number) {
 interface Props {
   episodes: EpisodesState
   currentEpisode: Episode | null
-  progress: number    // 0–1, only meaningful for currentEpisode
-  elapsed: number     // seconds, only meaningful for currentEpisode
+  elapsed: number     // seconds; live for currentEpisode, ep.startTime for others
   onSelect: (episode: Episode) => void
   onClose: () => void
 }
 
-export default function EpisodePicker({ episodes, currentEpisode, progress, elapsed, onSelect, onClose }: Props) {
+export default function EpisodePicker({ episodes, currentEpisode, elapsed, onSelect, onClose }: Props) {
   const { episodes: list, loading, error } = episodes
 
   return (
@@ -37,6 +36,9 @@ export default function EpisodePicker({ episodes, currentEpisode, progress, elap
 
         {list.map((ep: Episode) => {
           const current = currentEpisode?.id === ep.id
+          const epElapsed = current ? elapsed : (ep.startTime ?? 0)
+          const epProgress = ep.duration > 0 ? epElapsed / ep.duration : 0
+          const started = epElapsed > 0
           return (
             <Touchable
               key={ep.id}
@@ -53,13 +55,13 @@ export default function EpisodePicker({ episodes, currentEpisode, progress, elap
               <div style={s.info}>
                 <div style={s.epTitle}>{ep.title}</div>
                 <div style={s.epMeta}>
-                  {formatDate(ep.publishedAt)} · {current
-                    ? `${formatDuration(elapsed)} / ${formatDuration(ep.duration)}`
+                  {formatDate(ep.publishedAt)} · {started
+                    ? `${formatDuration(epElapsed)} / ${formatDuration(ep.duration)}`
                     : formatDuration(ep.duration)}
                 </div>
-                {current && (
+                {started && (
                   <div style={s.epProgress}>
-                    <div style={{ ...s.epProgressFill, width: `${progress * 100}%` }} />
+                    <div style={{ ...s.epProgressFill, width: `${epProgress * 100}%` }} />
                   </div>
                 )}
               </div>
