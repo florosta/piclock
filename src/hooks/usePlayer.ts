@@ -30,6 +30,8 @@ export function usePlayer(): PlayerState {
   const [duration, setDuration] = useState(0)
   const [sleepTimerEnds, setSleepTimerEnds] = useState<number | null>(null)
   const [sleepTimer, setSleepTimerDisplay] = useState<number | null>(null)
+  // Desired seek position to apply once duration is known after a src change
+  const startTimeRef = useRef(0)
 
   // Attach audio event listeners once
   useEffect(() => {
@@ -41,7 +43,13 @@ export function usePlayer(): PlayerState {
         setElapsed(el.currentTime)
       }
     }
-    const onDurationChange = () => setDuration(el.duration || 0)
+    const onDurationChange = () => {
+      setDuration(el.duration || 0)
+      if (startTimeRef.current > 0 && el.duration) {
+        el.currentTime = startTimeRef.current
+        startTimeRef.current = 0
+      }
+    }
     const onEnded = () => { setPlaying(false); setSleepTimerEnds(null) }
     el.addEventListener('timeupdate', onTimeUpdate)
     el.addEventListener('durationchange', onDurationChange)
@@ -71,10 +79,38 @@ export function usePlayer(): PlayerState {
     return () => clearInterval(id)
   }, [sleepTimerEnds])
 
+  function reportProgress(ep: Episode, currentTime: number, duration: number) {
+    if (!duration) return
+    fetch(`/api/abs-progress/${ep.podcast.itemId}/${ep.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        currentTime,
+        duration,
+        progress: currentTime / duration,
+        isFinished: currentTime / duration > 0.99,
+      }),
+    }).catch(() => {})
+  }
+
+  // 30s progress sync while playing — uses refs so the interval never goes stale
+  useEffect(() => {
+    if (!playing) return
+    const id = setInterval(() => {
+      const el = audioRef.current
+      const ep = currentEpisodeRef.current
+      if (el && ep && el.duration) reportProgress(ep, el.currentTime, el.duration)
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [playing])
+
   // Load episode into audio element without playing
   const select = useCallback((episode: Episode) => {
     const el = audioRef.current
+    const prev = currentEpisodeRef.current
+    if (el && prev && el.duration) reportProgress(prev, el.currentTime, el.duration)
     if (el) { el.pause(); el.src = '' }
+    startTimeRef.current = episode.startTime ?? 0
     setPlaying(false)
     setProgress(0)
     setElapsed(0)
@@ -99,7 +135,10 @@ export function usePlayer(): PlayerState {
   }, [])
 
   const stop = useCallback(() => {
-    audioRef.current?.pause()
+    const el = audioRef.current
+    const ep = currentEpisodeRef.current
+    if (el && ep && el.duration) reportProgress(ep, el.currentTime, el.duration)
+    el?.pause()
     setPlaying(false)
   }, [])
 

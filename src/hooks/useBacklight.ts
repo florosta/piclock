@@ -11,7 +11,7 @@ async function setBrightness(value: number) {
   })
 }
 
-export function useBacklight() {
+export function useBacklight(): { setFullBrightness: (v: number) => void } {
   const fullBrightness = useRef(15)
   const isDimmed = useRef(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -46,4 +46,6 @@ export function useBacklight() {
       if (timer.current) clearTimeout(timer.current)
     }
   }, [])
+
+  return { setFullBrightness: (v: number) => { fullBrightness.current = v } }
 }

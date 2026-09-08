@@ -1,9 +1,9 @@
-import { configFor, iconFor, sortAreas, sortEntities, valueFor } from '../config/ha'
+import { configFor, iconFor, showInHousePanel, sortAreas, sortEntities, valueFor } from '../config/ha'
 import type { DiscoveredEntity, EntityConfig } from '../config/ha'
 import type { HouseState } from '../hooks/useHouse'
 import Icon from '../ui/Icon'
 import Scroller from '../ui/Scroller'
-import Sheet, { IconButton } from '../ui/Sheet'
+import Sheet from '../ui/Sheet'
 import { s as sheet } from '../ui/styles'
 import Touchable from '../ui/Touchable'
 
@@ -13,12 +13,13 @@ interface Props {
 }
 
 export default function HADashboard({ house, onClose }: Props) {
-  const { areas, loading, configured, refresh, toggle } = house
+  const { areas, loading, configured, toggle } = house
 
   // Everything below is derived from what HA reported — no entity, area or
   // ordering is written down in this repo.
   const sections = sortAreas(areas).map(({ area, entities }) => {
     const withConfig = entities
+      .filter(entity => showInHousePanel(entity))
       .map(entity => ({ entity, config: configFor(entity) }))
       .filter(({ config }) => config.label)
     const order = sortEntities(withConfig.map(w => w.config))
@@ -31,11 +32,7 @@ export default function HADashboard({ house, onClose }: Props) {
   }).filter(section => section.items.length > 0)
 
   return (
-    <Sheet
-      title="House"
-      onClose={onClose}
-      actions={<IconButton name="refresh" label="Refresh" onClick={refresh} />}
-    >
+    <Sheet title="House" onClose={onClose}>
       {loading ? (
         <div style={sheet.status}>Loading…</div>
       ) : !configured ? (

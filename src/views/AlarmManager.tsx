@@ -13,27 +13,40 @@ function pad(n: number) { return String(n).padStart(2, '0') }
 interface Props {
   alarms: Alarm[]
   onAdd: (data: Omit<Alarm, 'id'>) => void
+  onEdit: (id: string, data: Omit<Alarm, 'id'>) => void
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onClose: () => void
 }
 
-export default function AlarmManager({ alarms, onAdd, onToggle, onDelete, onClose }: Props) {
+export default function AlarmManager({ alarms, onAdd, onEdit, onToggle, onDelete, onClose }: Props) {
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<Alarm | null>(null)
   const [hour, setHour] = useState(7)
   const [minute, setMinute] = useState(30)
   const [newDays, setNewDays] = useState<number[]>([1, 2, 3, 4, 5])
-  const [newLabel, setNewLabel] = useState('')
-
   function reset() {
     setAdding(false)
+    setEditing(null)
     setHour(7); setMinute(30)
     setNewDays([1, 2, 3, 4, 5])
-    setNewLabel('')
+  }
+
+  function startEdit(alarm: Alarm) {
+    const [h, m] = alarm.time.split(':').map(Number)
+    setHour(h); setMinute(m)
+    setNewDays([...alarm.days])
+    setEditing(alarm)
   }
 
   function submitAdd() {
-    onAdd({ time: `${pad(hour)}:${pad(minute)}`, days: newDays, label: newLabel, enabled: true })
+    onAdd({ time: `${pad(hour)}:${pad(minute)}`, days: newDays, enabled: true })
+    reset()
+  }
+
+  function submitEdit() {
+    if (!editing) return
+    onEdit(editing.id, { time: `${pad(hour)}:${pad(minute)}`, days: newDays, enabled: editing.enabled })
     reset()
   }
 
@@ -41,13 +54,16 @@ export default function AlarmManager({ alarms, onAdd, onToggle, onDelete, onClos
     setNewDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])
   }
 
+  const inForm = adding || editing !== null
+  const title = adding ? 'New alarm' : editing ? 'Edit alarm' : 'Alarms'
+
   return (
     // On a 720px-tall screen the add form would sit below the list and need
     // scrolling to reach, so it takes the sheet over instead of appending to it.
-    <Sheet title={adding ? 'New alarm' : 'Alarms'} onClose={onClose}>
+    <Sheet title={title} onClose={onClose}>
       <Scroller style={s.list}>
 
-        {adding ? (
+        {inForm ? (
           <div style={s.addForm}>
             <TimeStepper hour={hour} minute={minute} onHour={setHour} onMinute={setMinute} />
 
@@ -58,29 +74,22 @@ export default function AlarmManager({ alarms, onAdd, onToggle, onDelete, onClos
               <Chip on={newDays.length === 0} onClick={() => setNewDays([])}>1×</Chip>
             </div>
 
-            <input
-              type="text"
-              placeholder="Label (optional)"
-              value={newLabel}
-              onChange={e => setNewLabel(e.target.value)}
-              style={s.labelInput}
-            />
-
             <div style={s.addActions}>
               <Touchable onClick={reset} style={s.textBtn}>Cancel</Touchable>
-              <Touchable onClick={submitAdd} active style={s.textBtn}>Save</Touchable>
+              <Touchable onClick={adding ? submitAdd : submitEdit} active style={s.textBtn}>Save</Touchable>
             </div>
           </div>
         ) : (
           <>
             {alarms.map(alarm => (
               <div key={alarm.id} style={s.row}>
+                <Touchable onClick={() => startEdit(alarm)} style={s.editOverlay}>{null}</Touchable>
                 <div style={s.rowLeft}>
                   <div style={{ ...s.alarmTime, opacity: alarm.enabled ? 1 : 'var(--o-tertiary)' }}>
                     {alarm.time}
                   </div>
                   <div style={sheet.label}>
-                    {alarm.label || (alarm.days.length === 0 ? 'Once' : alarm.days.map(d => DAY_LABELS[d]).join(' '))}
+                    {alarm.days.length === 0 ? 'Once' : alarm.days.map(d => DAY_LABELS[d]).join(' ')}
                   </div>
                 </div>
                 <div style={s.rowRight}>
@@ -183,14 +192,19 @@ const s: Record<string, React.CSSProperties> = {
   },
   // Rows are separated by the gap between raised fills, not by rules.
   row: {
+    position: 'relative',
     flexShrink: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: 'var(--s-2) var(--s-3)',
     borderRadius: 'var(--r-md)',
     background: 'var(--surface-raised)',
   },
+  editOverlay: {
+    position: 'absolute', inset: 0,
+    borderRadius: 'var(--r-md)',
+  },
   rowLeft: { display: 'flex', flexDirection: 'column', gap: 'var(--s-1)' },
-  rowRight: { display: 'flex', alignItems: 'center', gap: 'var(--s-2)' },
+  rowRight: { position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 'var(--s-2)' },
   alarmTime: {
     fontSize: 'var(--t-xl)', fontWeight: 200, lineHeight: 1,
     letterSpacing: '0.02em', fontVariantNumeric: 'tabular-nums',

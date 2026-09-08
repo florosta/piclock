@@ -12,7 +12,7 @@ const app = express()
 const PORT = 3000
 const ABS = `http://localhost:13378`
 const TOKEN = process.env.ABS_TOKEN!
-const ALARM_SOUND = process.env.ALARM_SOUND || path.join(__dirname, '../sounds/alarm.mp3')
+const ALARM_SOUND = process.env.ALARM_SOUND || path.join(__dirname, '../sounds/rooster.wav')
 const ALARMS_FILE = path.join(__dirname, '../alarms.json')
 const HA_URL = process.env.HA_URL
 const HA_TOKEN = process.env.HA_TOKEN
@@ -51,7 +51,6 @@ app.get('/api/events', (req, res) => {
 // Mirrors src/types.ts Alarm — keep in sync
 interface Alarm {
   id: string
-  label: string
   time: string      // "07:30"
   days: number[]    // 0=Sun..6=Sat; empty = one-off (next occurrence)
   enabled: boolean
@@ -100,21 +99,64 @@ app.delete('/api/alarms/:id', (req, res) => {
 // ---------------------------------------------------------------------------
 
 let audioProc: ReturnType<typeof spawn> | null = null
+let savedVolume: string | null = null
+let alarmLoopTimer: ReturnType<typeof setTimeout> | null = null
+
+function setAlarmVolume() {
+  try {
+    if (volumeBackend.kind === 'wpctl') {
+      const out = execSync('wpctl get-volume @DEFAULT_AUDIO_SINK@').toString()
+      const match = out.match(/Volume:\s+([\d.]+)/)
+      savedVolume = match ? match[1] : null
+      execSync(`wpctl set-volume @DEFAULT_AUDIO_SINK@ ${WPCTL_MAX}`)
+      execSync('wpctl set-mute @DEFAULT_AUDIO_SINK@ 0')
+    } else if (volumeBackend.kind === 'amixer') {
+      const { card, control } = volumeBackend
+      const out = execSync(`amixer -M -c ${card} get "${control}"`).toString()
+      const match = out.match(/\[(\d+)%\]/)
+      savedVolume = match ? `${match[1]}%` : null
+      execSync(`amixer -M -c ${card} set "${control}" 100% unmute`)
+    }
+  } catch {}
+}
+
+function restoreVolume() {
+  if (!savedVolume) return
+  try {
+    if (volumeBackend.kind === 'wpctl') {
+      execSync(`wpctl set-volume @DEFAULT_AUDIO_SINK@ ${savedVolume}`)
+    } else if (volumeBackend.kind === 'amixer') {
+      const { card, control } = volumeBackend
+      execSync(`amixer -M -c ${card} set "${control}" ${savedVolume}`)
+    }
+  } catch {}
+  savedVolume = null
+}
+
+function playAlarmOnce() {
+  audioProc?.kill()
+  audioProc = spawn('mpv', [ALARM_SOUND])
+  audioProc.on('error', e => console.error('mpv failed to start:', e.message))
+  audioProc.stderr?.on('data', (d: Buffer) => console.error('mpv:', d.toString().trim()))
+  audioProc.on('close', () => {
+    if (audioProc !== null) alarmLoopTimer = setTimeout(playAlarmOnce, 2000)
+  })
+}
 
 function startAlarmAudio() {
   if (!existsSync(ALARM_SOUND)) {
     console.error(`Alarm sound not found: ${ALARM_SOUND}`)
     return
   }
-  audioProc?.kill()
-  audioProc = spawn('mpv', ['--loop=inf', ALARM_SOUND])
-  audioProc.on('error', e => console.error('mpv failed to start:', e.message))
-  audioProc.stderr?.on('data', (d: Buffer) => console.error('mpv:', d.toString().trim()))
+  setAlarmVolume()
+  playAlarmOnce()
 }
 
 function stopAlarmAudio() {
+  if (alarmLoopTimer) { clearTimeout(alarmLoopTimer); alarmLoopTimer = null }
   audioProc?.kill()
   audioProc = null
+  restoreVolume()
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +166,7 @@ function stopAlarmAudio() {
 let snoozeTimer: ReturnType<typeof setTimeout> | null = null
 
 function fireAlarm(alarm: Alarm) {
-  console.log(`Firing alarm: ${alarm.label || alarm.time}`)
+  console.log(`Firing alarm: ${alarm.time}`)
   startAlarmAudio()
   broadcast('alarm', { alarm })
   activateScene()
@@ -266,6 +308,13 @@ app.post('/api/ha/service', async (req, res) => {
   res.status(r.ok ? 200 : r.status).json({ ok: r.ok })
 })
 
+// Requires passwordless sudo for shutdown:
+//   echo "florence ALL=(ALL) NOPASSWD: /sbin/shutdown" | sudo tee /etc/sudoers.d/piclock
+app.post('/api/system/shutdown', (_req, res) => {
+  res.json({ ok: true })
+  setTimeout(() => spawn('sudo', ['shutdown', '-h', 'now']), 500)
+})
+
 app.post('/api/alarm/dismiss', (_req, res) => {
   stopAlarmAudio()
   if (snoozeTimer) { clearTimeout(snoozeTimer); snoozeTimer = null }
@@ -278,7 +327,7 @@ app.post('/api/alarm/snooze', (req, res) => {
   stopAlarmAudio()
   broadcast('alarm-dismissed', {})
   snoozeTimer = setTimeout(() => {
-    fireAlarm({ id: 'snooze', label: 'Snoozed alarm', time: '', days: [], enabled: true })
+    fireAlarm({ id: 'snooze', time: '', days: [], enabled: true })
   }, minutes * 60 * 1000)
   res.json({ ok: true, snoozeMinutes: minutes })
 })
@@ -339,12 +388,17 @@ app.get('/api/episodes', async (_req, res) => {
         id: string
         media: {
           metadata: { title: string; imageUrl: string }
-          episodes: { id: string; title: string; duration: number; publishedAt: number; audioTrack: { ino: string } }[]
+          episodes: {
+            id: string; title: string; duration: number; publishedAt: number; audioTrack: { ino: string }
+            userEpisode?: { currentTime: number; isFinished: boolean }
+          }[]
         }
       }
       for (const ep of data.media.episodes) {
+        const ue = ep.userEpisode
         episodes.push({
           ...ep,
+          startTime: ue && !ue.isFinished ? (ue.currentTime ?? 0) : 0,
           podcast: { title: data.media.metadata.title, itemId: data.id, coverUrl: data.media.metadata.imageUrl },
         })
       }
@@ -352,6 +406,16 @@ app.get('/api/episodes', async (_req, res) => {
   }
   episodes.sort((a: any, b: any) => b.publishedAt - a.publishedAt)
   res.json(episodes)
+})
+
+app.patch('/api/abs-progress/:itemId/:episodeId', async (req, res) => {
+  const { itemId, episodeId } = req.params
+  const r = await fetch(`${ABS}/api/me/progress/${itemId}/${episodeId}`, {
+    method: 'PATCH',
+    headers: absHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(req.body),
+  }).catch(() => null)
+  res.status(r?.ok ? 200 : 500).json({ ok: r?.ok ?? false })
 })
 
 app.get('/api/stream/:itemId/:ino', async (req, res) => {
@@ -414,14 +478,20 @@ console.log(
                                       'volume: no backend found — clients will fall back to player gain'
 )
 
+// wpctl linear amplitude range for the volume slider.
+// MAX is where the Pi's output saturates; MIN is 0 (full silence at 0%).
+const WPCTL_MIN = 0
+const WPCTL_MAX = 0.25
+
 app.get('/api/volume', (_req, res) => {
   if (volumeBackend.kind === 'unsupported') return res.json({ value: 50, supported: false })
   try {
     if (volumeBackend.kind === 'wpctl') {
       const out = execSync('wpctl get-volume @DEFAULT_AUDIO_SINK@').toString()
       const match = out.match(/Volume:\s+([\d.]+)/)
-      const raw = match ? parseFloat(match[1]) : 0.5
-      return res.json({ value: Math.min(100, Math.round(raw * 100)), supported: true, control: 'wpctl' })
+      const raw = match ? parseFloat(match[1]) : WPCTL_MIN
+      const ui = Math.round(Math.max(0, Math.min(100, Math.sqrt((raw - WPCTL_MIN) / (WPCTL_MAX - WPCTL_MIN)) * 100)))
+      return res.json({ value: ui, supported: true, control: 'wpctl' })
     }
     const { card, control } = volumeBackend
     const out = execSync(`amixer -M -c ${card} get "${control}"`).toString()
@@ -438,8 +508,8 @@ app.post('/api/volume', (req, res) => {
   if (volumeBackend.kind === 'unsupported') return res.json({ ok: false, value: clamped })
   try {
     if (volumeBackend.kind === 'wpctl') {
-      // -l 1.0 prevents boost beyond unity; unmute in case the sink was muted
-      execSync(`wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ ${(clamped / 100).toFixed(2)}`)
+      const linear = (WPCTL_MIN + ((clamped / 100) ** 2) * (WPCTL_MAX - WPCTL_MIN)).toFixed(4)
+      execSync(`wpctl set-volume -l ${WPCTL_MAX} @DEFAULT_AUDIO_SINK@ ${linear}`)
       execSync('wpctl set-mute @DEFAULT_AUDIO_SINK@ 0')
       return res.json({ ok: true, value: clamped })
     }

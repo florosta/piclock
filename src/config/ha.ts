@@ -55,6 +55,13 @@ export const OVERRIDES: Record<string, { label?: string; icon?: IconName; hide?:
 
 const TOGGLE_DOMAINS = new Set(['light', 'switch', 'fan', 'input_boolean', 'cover', 'lock'])
 
+/** Returns true for entities that should appear in the house panel. */
+export function showInHousePanel(e: DiscoveredEntity): boolean {
+  if (e.domain === 'light') return true
+  if (e.domain === 'switch') return e.device_class === 'outlet' || e.device_class === 'plug'
+  return false
+}
+
 const FORMAT_BY_CLASS: Record<string, SensorFormat> = {
   temperature: 'temp',
   humidity: 'humidity',

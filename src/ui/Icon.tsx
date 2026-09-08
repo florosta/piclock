@@ -24,11 +24,12 @@ export type IconName =
   | 'bulb' | 'thermometer' | 'droplet' | 'radiator' | 'bolt' | 'coin'
   | 'door' | 'person'
   | 'sun' | 'cloud' | 'cloudSun' | 'rain' | 'snow' | 'fog' | 'wind' | 'unknown'
+  | 'settings' | 'power'
 
 /** Icons whose holes need evenodd rather than nonzero winding. */
 const EVENODD = new Set<IconName>([
   'alarm', 'home', 'toggleOn', 'toggleOff', 'coin', 'unknown', 'bulb', 'radiator',
-  'door',
+  'door', 'settings',
 ])
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -111,6 +112,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
   fog: <path d="M3 6.2h18v2.7H3zm2.4 5.5h16.2v2.7H5.4zM3 17.2h13.8v2.7H3z" />,
   wind: <path d="M2.6 6.4h9.8a2.2 2.2 0 1 0-2.2-2.2H7.4a4.9 4.9 0 1 1 4.9 4.9H2.6zm0 8.5h11.9a4.9 4.9 0 1 1-4.9 4.9h2.8a2.2 2.2 0 1 0 2.2-2.2H2.6z" />,
   unknown: <path d="M12 2.4a9.6 9.6 0 1 0 0 19.2 9.6 9.6 0 0 0 0-19.2zm-.2 3.8a3.7 3.7 0 0 1 2 6.8c-.5.3-.7.6-.7 1v.8h-2.4v-1.2c0-1.1.5-1.8 1.5-2.4.7-.4 1-.8 1-1.4a1.4 1.4 0 0 0-2.8 0H8a3.7 3.7 0 0 1 3.8-3.6zM10.7 16.4h2.6V19h-2.6z" />,
+
+  // ── system ─────────────────────────────────────────────────────────────
+  settings: <path d="M10.1 2h3.8l.6 2.8a7.5 7.5 0 0 1 2.2 1.3l2.7-.9 1.9 3.3-2 1.9a7.5 7.5 0 0 1 0 3.2l2 1.9-1.9 3.3-2.7-.9a7.5 7.5 0 0 1-2.2 1.3L13.9 22h-3.8l-.6-2.8a7.5 7.5 0 0 1-2.2-1.3l-2.7.9-1.9-3.3 2-1.9a7.5 7.5 0 0 1 0-3.2l-2-1.9 1.9-3.3 2.7.9A7.5 7.5 0 0 1 9.5 4.8z M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" />,
+  // Ring arc with 60° gap at top (outer r=9, inner r=6.5) + vertical bar through the gap
+  power: <>
+    <path d="M7.5 4.2A9 9 0 1 0 16.5 4.2L15.3 6.4A6.5 6.5 0 1 1 8.7 6.4Z" />
+    <path d="M10.8 1.5h2.4v8.5h-2.4Z" />
+  </>,
 }
 
 interface Props {

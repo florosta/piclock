@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { iconFor, valueFor } from '../config/ha'
 import type { EntityConfig } from '../config/ha'
 import type { HAState } from '../hooks/useHA'
@@ -31,10 +31,12 @@ interface Props {
   onShowPicker: () => void
   onShowAlarms: () => void
   onShowHA: () => void
+  onShowVolume: () => void
+  onShowSettings: () => void
 }
 
 export default function ClockView({
-  player, volume, nextAlarm, clockEntities, onShowPicker, onShowAlarms, onShowHA,
+  player, volume, nextAlarm, clockEntities, onShowPicker, onShowAlarms, onShowHA, onShowVolume, onShowSettings,
 }: Props) {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
@@ -43,9 +45,36 @@ export default function ClockView({
     return () => clearInterval(id)
   }, [])
 
-  const { currentEpisode, playing, progress, sleepTimer, play, stop, skip, setSleepTimer, cancelSleepTimer } = player
+  const { currentEpisode, playing, progress, sleepTimer, play, stop, skip, seekTo, setSleepTimer, cancelSleepTimer } = player
 
-  const [volumeOpen, setVolumeOpen] = useState(false)
+  const scrubbing = useRef(false)
+  const [scrubRatio, setScrubRatio] = useState<number | null>(null)
+
+  function ratioFromPointer(e: React.PointerEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  }
+
+  function onScrubDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!currentEpisode) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    scrubbing.current = true
+    setScrubRatio(ratioFromPointer(e))
+  }
+
+  function onScrubMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!scrubbing.current) return
+    setScrubRatio(ratioFromPointer(e))
+  }
+
+  function onScrubUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!scrubbing.current) return
+    scrubbing.current = false
+    const ratio = ratioFromPointer(e)
+    setScrubRatio(null)
+    seekTo(ratio)
+  }
 
   // Pressing play always arms a 15-min sleep timer — intentional bedtime UX.
   // At rest the button is a play mark; once the timer is running it becomes a
@@ -68,18 +97,15 @@ export default function ClockView({
           <span style={s.aboveItem}>
             {DAYS[now.getDay()]} {now.getDate()} {MONTHS[now.getMonth()]}
           </span>
+          <Touchable style={s.settingsBtn} onClick={onShowSettings} aria-label="Settings">
+            <Icon name="settings" />
+          </Touchable>
         </div>
 
         <div style={s.time}>{pad(now.getHours())}:{pad(now.getMinutes())}</div>
       </div>
 
-      {volumeOpen && <div style={s.dismiss} onPointerDown={() => setVolumeOpen(false)} />}
-
       <div style={s.strip}>
-        {volumeOpen && (
-          <VolumePopover volume={volume} onDone={() => setVolumeOpen(false)} />
-        )}
-
         <div style={s.btnRow}>
           <Key icon="rewind" label="Back 20 seconds" onClick={() => skip(-20)} disabled={!currentEpisode} repeat />
 
@@ -105,8 +131,7 @@ export default function ClockView({
           <Key
             icon="volumeUp"
             label={`Volume ${volume.value}%`}
-            onClick={() => setVolumeOpen(o => !o)}
-            active={volumeOpen}
+            onClick={onShowVolume}
           >
             <span style={s.stack}>
               <Icon name={volume.value === 0 ? 'volumeDown' : 'volumeUp'} size="0.7em" />
@@ -138,71 +163,24 @@ export default function ClockView({
 
       {/* Full bleed on the very bottom edge, with no track behind it: at rest
           there is nothing to see, and playing draws a bar across the foot of
-          the screen. */}
-      <div style={s.progressBar}>
-        <div style={{ ...s.progressFill, width: `${progress * 100}%` }} />
-      </div>
-
-    </div>
-  )
-}
-
-/**
- * A slider you drag straight to the value, rather than a pair of keys you press
- * eight times. Pointer-driven rather than <input type="range">: the native
- * control wants a thumb hit exactly, this takes a press anywhere on the track,
- * which is the difference between usable and not with a thumb in the dark.
- *
- * Closes itself after a few seconds of stillness so it never sits over the clock.
- */
-function VolumePopover({ volume, onDone }: { volume: VolumeState; onDone: () => void }) {
-  const track = useRef<HTMLDivElement>(null)
-  const dragging = useRef(false)
-  const idle = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const bump = useCallback(() => {
-    if (idle.current) clearTimeout(idle.current)
-    idle.current = setTimeout(onDone, 4000)
-  }, [onDone])
-
-  const setFromX = useCallback((clientX: number) => {
-    const node = track.current
-    if (!node) return
-    const r = node.getBoundingClientRect()
-    volume.set(((clientX - r.left) / r.width) * 100)
-    bump()
-  }, [volume, bump])
-
-  useEffect(() => {
-    bump()
-    function move(e: PointerEvent) { if (dragging.current) setFromX(e.clientX) }
-    function up() { dragging.current = false }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', up)
-    return () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', up)
-      if (idle.current) clearTimeout(idle.current)
-    }
-  }, [bump, setFromX])
-
-  return (
-    <div style={s.popover} onPointerDown={e => e.stopPropagation()}>
-      <div style={s.popoverHead}>
-        <Icon name={volume.value === 0 ? 'volumeDown' : 'volumeUp'} />
-        <span style={s.popoverValue}>{volume.value}%</span>
-        {!volume.systemVolume && <span style={s.popoverNote}>app only</span>}
-      </div>
+          the screen. The paddingTop extends the hit area without changing the
+          visual strip height. */}
       <div
-        ref={track}
-        style={s.track}
-        onPointerDown={e => { dragging.current = true; setFromX(e.clientX) }}
+        style={{ ...s.progressBar, cursor: currentEpisode ? 'pointer' : undefined }}
+        onPointerDown={onScrubDown}
+        onPointerMove={onScrubMove}
+        onPointerUp={onScrubUp}
+        onPointerCancel={onScrubUp}
       >
-        <div style={s.trackBase} />
-        <div style={{ ...s.trackFill, width: `${volume.value}%` }} />
+        <div style={s.progressTrack}>
+          <div style={{
+            ...s.progressFill,
+            width: `${(scrubRatio ?? progress) * 100}%`,
+            transition: scrubbing.current ? 'none' : 'width 1s linear',
+          }} />
+        </div>
       </div>
+
     </div>
   )
 }
@@ -240,6 +218,12 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%', height: '100%',
     display: 'flex', flexDirection: 'column',
   },
+  settingsBtn: {
+    position: 'absolute', right: 0,
+    width: '5vw', height: '5vw',
+    fontSize: 'var(--t-sm)',
+    opacity: 'var(--o-disabled)',
+  },
   clock: {
     flex: 1, minHeight: 0,
     display: 'flex', flexDirection: 'column',
@@ -247,7 +231,9 @@ const s: Record<string, React.CSSProperties> = {
     gap: 'var(--s-2)',
   },
   above: {
-    display: 'flex', alignItems: 'center', gap: 'var(--s-4)',
+    position: 'relative',
+    width: '100%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--s-4)',
     fontSize: 'var(--t-md)',
     opacity: 'var(--o-primary)',
     letterSpacing: 'var(--track-wide)',
@@ -281,13 +267,16 @@ const s: Record<string, React.CSSProperties> = {
   },
   progressBar: {
     flexShrink: 0,
-    height: '0.7vw', background: 'transparent',
+    paddingTop: '2vw',
+    background: 'transparent',
+  },
+  progressTrack: {
+    height: '0.7vw',
     position: 'relative', overflow: 'hidden',
   },
   progressFill: {
     position: 'absolute', inset: '0 auto 0 0',
     background: 'var(--amber-dim)',
-    transition: 'width 1s linear',
   },
   btnRow: { display: 'flex', gap: 'var(--s-2)' },
   key: {
@@ -314,56 +303,4 @@ const s: Record<string, React.CSSProperties> = {
     fontVariantNumeric: 'tabular-nums',
   },
 
-  // Catches a press anywhere else on screen so the popover dismisses.
-  dismiss: { position: 'fixed', inset: 0, zIndex: 4 },
-  popover: {
-    position: 'absolute', zIndex: 5,
-    left: '50%', transform: 'translateX(-50%)',
-    bottom: 'calc(100% - var(--s-2))',
-    width: '52vw',
-    background: 'var(--surface)',
-    borderRadius: 'var(--r-lg)',
-    padding: 'var(--s-3)',
-    display: 'flex', flexDirection: 'column', gap: 'var(--s-1)',
-    boxShadow: '0 -1vw 4vw rgba(0,0,0,0.6)',
-  },
-  popoverHead: {
-    display: 'flex', alignItems: 'center', gap: 'var(--s-2)',
-    fontSize: 'var(--t-md)',
-  },
-  popoverValue: {
-    fontSize: 'var(--t-lg)', fontWeight: 200, lineHeight: 1,
-    fontVariantNumeric: 'tabular-nums',
-  },
-  popoverNote: {
-    marginLeft: 'auto',
-    fontSize: 'var(--t-xs)',
-    opacity: 'var(--o-tertiary)',
-    letterSpacing: 'var(--track-label)',
-    textTransform: 'uppercase',
-  },
-  // A tall press target with a slim track drawn inside it: the whole band
-  // takes the press, the visible bar just shows where you landed.
-  track: {
-    height: '7vw',
-    display: 'flex', alignItems: 'center',
-    position: 'relative',
-    touchAction: 'none',
-  },
-  trackBase: {
-    position: 'absolute', inset: 'auto 0', top: '50%',
-    transform: 'translateY(-50%)',
-    height: '2.4vw',
-    background: 'var(--surface-raised)',
-    borderRadius: '999px',
-    pointerEvents: 'none',
-  },
-  trackFill: {
-    position: 'absolute', left: 0, top: '50%',
-    transform: 'translateY(-50%)',
-    height: '2.4vw',
-    background: 'var(--amber-dim)',
-    borderRadius: '999px',
-    pointerEvents: 'none',
-  },
 }

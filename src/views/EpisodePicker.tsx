@@ -19,11 +19,13 @@ function formatDate(ms: number) {
 interface Props {
   episodes: EpisodesState
   currentEpisode: Episode | null
+  progress: number    // 0–1, only meaningful for currentEpisode
+  elapsed: number     // seconds, only meaningful for currentEpisode
   onSelect: (episode: Episode) => void
   onClose: () => void
 }
 
-export default function EpisodePicker({ episodes, currentEpisode, onSelect, onClose }: Props) {
+export default function EpisodePicker({ episodes, currentEpisode, progress, elapsed, onSelect, onClose }: Props) {
   const { episodes: list, loading, error } = episodes
 
   return (
@@ -51,8 +53,15 @@ export default function EpisodePicker({ episodes, currentEpisode, onSelect, onCl
               <div style={s.info}>
                 <div style={s.epTitle}>{ep.title}</div>
                 <div style={s.epMeta}>
-                  {formatDate(ep.publishedAt)} · {formatDuration(ep.duration)}
+                  {formatDate(ep.publishedAt)} · {current
+                    ? `${formatDuration(elapsed)} / ${formatDuration(ep.duration)}`
+                    : formatDuration(ep.duration)}
                 </div>
+                {current && (
+                  <div style={s.epProgress}>
+                    <div style={{ ...s.epProgressFill, width: `${progress * 100}%` }} />
+                  </div>
+                )}
               </div>
               <span style={{ ...s.check, opacity: current ? 'var(--o-primary)' : 0 }}>
                 <Icon name="check" />
@@ -97,4 +106,15 @@ const s: Record<string, React.CSSProperties> = {
     textAlign: 'left',
   },
   check: { fontSize: 'var(--t-lg)', flexShrink: 0, display: 'flex' },
+  epProgress: {
+    marginTop: 'var(--s-1)',
+    height: '0.3vw',
+    background: 'var(--surface)',
+    borderRadius: '999px',
+    overflow: 'hidden',
+  },
+  epProgressFill: {
+    height: '100%',
+    background: 'var(--amber-dim)',
+  },
 }

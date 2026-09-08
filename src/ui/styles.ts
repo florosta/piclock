@@ -42,8 +42,8 @@ export const s: Record<string, React.CSSProperties> = {
   actions: { display: 'flex', gap: 'var(--s-2)', alignItems: 'center' },
   iconBtn: {
     background: 'none', border: 'none',
-    fontSize: 'var(--t-md)',
-    width: '6vw', height: '6vw',
+    fontSize: 'var(--t-lg)',
+    width: '9vw', height: '9vw',
   },
 
   /* Shared content styles, so every sheet's rows and labels match */

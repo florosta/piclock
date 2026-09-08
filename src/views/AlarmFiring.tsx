@@ -13,7 +13,6 @@ export default function AlarmFiring({ alarm, onDismiss, onSnooze }: Props) {
     <div style={s.root}>
       <div style={s.icon}><Icon name="alarm" /></div>
       <div style={s.time}>{alarm.time || 'Alarm'}</div>
-      {alarm.label && <div style={s.label}>{alarm.label}</div>}
 
       {/* Half awake, in the dark: two targets, far apart, impossible to
           confuse — snooze on the left, dismiss lit on the right. */}
@@ -48,12 +47,6 @@ const s: Record<string, React.CSSProperties> = {
     lineHeight: 1,
     color: 'var(--amber)',
     textShadow: '0 0 80px rgba(232,201,122,0.4)',
-  },
-  label: {
-    fontSize: 'var(--t-md)',
-    opacity: 'var(--o-secondary)',
-    letterSpacing: 'var(--track-wide)',
-    textTransform: 'uppercase',
   },
   btns: { display: 'flex', gap: 'var(--s-5)', marginTop: 'var(--s-4)' },
   btn: {

@@ -74,7 +74,7 @@ export function useAlarms() {
       const [h, m] = alarm.time.split(':').map(Number)
       const alarmMins = h * 60 + m
       const days = alarm.days.length > 0 ? alarm.days : [0, 1, 2, 3, 4, 5, 6]
-      for (let offset = 0; offset < 7; offset++) {
+      for (let offset = 0; offset < 8; offset++) {
         const day = (today + offset) % 7
         if (!days.includes(day)) continue
         const minsFromNow = offset * 1440 + alarmMins - nowMins
@@ -86,5 +86,15 @@ export function useAlarms() {
     return earliest?.alarm ?? null
   })()
 
-  return { alarms, firingAlarm, nextAlarm, addAlarm, toggleAlarm, deleteAlarm, dismiss, snooze }
+  async function editAlarm(id: string, data: Omit<Alarm, 'id'>) {
+    const res = await fetch(`/api/alarms/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const alarm = await res.json() as Alarm
+    setAlarms(prev => prev.map(a => a.id === id ? alarm : a))
+  }
+
+  return { alarms, firingAlarm, nextAlarm, addAlarm, editAlarm, toggleAlarm, deleteAlarm, dismiss, snooze }
 }

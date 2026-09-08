@@ -5,6 +5,7 @@ export interface EpisodesState {
   episodes: Episode[]
   loading: boolean
   error: string | null
+  refresh: () => void
 }
 
 export function useEpisodes(): EpisodesState {
@@ -12,12 +13,16 @@ export function useEpisodes(): EpisodesState {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  function fetchEpisodes() {
+    setLoading(true)
+    setError(null)
     fetch('/api/episodes')
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then((data: Episode[]) => { setEpisodes(data); setLoading(false) })
       .catch((e: Error) => { setError(e.message); setLoading(false) })
-  }, [])
+  }
 
-  return { episodes, loading, error }
+  useEffect(() => { fetchEpisodes() }, [])
+
+  return { episodes, loading, error, refresh: fetchEpisodes }
 }
